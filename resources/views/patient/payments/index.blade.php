@@ -176,7 +176,7 @@
     }
     .pay-card .amount {
         font-family: 'Lora',serif; font-size: 1.05rem;
-        font-weight: 500; color: var(--txt);
+        font-weight: 500; color: var(--txt); flex-shrink: 0;
     }
     .pay-card .row2 {
         font-size: .75rem; color: var(--txt-lt);
@@ -204,6 +204,11 @@
     #pay-stats-strip { grid-template-columns: 1fr !important; }
     .unpaid-card .action { flex-direction: column; align-items: stretch; gap: 8px; }
     .unpaid-card .action button { width: 100%; }
+}
+
+@media (min-width: 381px) and (max-width: 480px) {
+    #pay-stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    #pay-stats-strip .panel:last-child { grid-column: 1 / -1; }
 }
 </style>
 @endpush
