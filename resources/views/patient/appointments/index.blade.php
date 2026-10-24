@@ -7,7 +7,7 @@
 
 {{-- Tabs --}}
 <div class="apt-tabs-row" style="display:flex;gap:2px;border-bottom:2px solid var(--warm-bd);margin-bottom:20px">
-    <div class="apt-tabs-scroll" style="display:flex;gap:2px;overflow-x:auto">
+    <div class="apt-tabs-scroll" style="display:flex;gap:2px;flex-wrap:wrap;min-width:0">
     @foreach(['upcoming' => "Upcoming ({$upcomingCount})", 'unpaid' => "Unpaid ({$unpaidCount})", 'past' => "Past ({$pastCount})", 'cancelled' => "Cancelled ({$cancelledCount})"] as $t => $lbl)
     <a href="{{ route('patient.appointments.index', ['tab' => $t]) }}"
        style="padding:10px 18px;font-size:.875rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap;
@@ -25,9 +25,11 @@
 </div>
 @push('styles')
 <style>
+.apt-tabs-scroll { flex: 1 1 auto; }
 @media (max-width: 560px) {
     .apt-tabs-row    { flex-wrap: wrap; }
-    .apt-tabs-scroll { flex: 1 1 100%; }
+    .apt-tabs-scroll { flex: 1 1 100%; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .apt-tabs-scroll a { padding: 10px 8px !important; text-align: center; white-space: normal !important; }
     .apt-card-body { padding: 14px 16px !important; gap: 10px !important; }
     .apt-main-info { min-width: 0 !important; flex: 1 1 calc(100% - 58px) !important; }
     .apt-main-info > div:first-child { gap: 4px !important; }
