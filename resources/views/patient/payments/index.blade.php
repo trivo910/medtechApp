@@ -67,6 +67,60 @@
 
 /* Payment history — table on desktop, cards on mobile */
 .pay-table-wrap { width: 100%; }
+.pay-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.pay-table th {
+    padding: 12px 18px;
+    background: var(--sand);
+    color: var(--txt-lt);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.pay-table td {
+    padding: 15px 18px;
+    border-top: 1px solid var(--warm-bd);
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+.pay-table th:nth-child(1) { width: 24%; }
+.pay-table th:nth-child(2) { width: 25%; }
+.pay-table th:nth-child(3) { width: 13%; }
+.pay-table th:nth-child(4) { width: 13%; }
+.pay-table th:nth-child(5) { width: 15%; }
+.pay-table th:nth-child(6) { width: 10%; }
+.pay-table th:nth-child(3),
+.pay-table th:nth-child(4),
+.pay-table th:nth-child(5) { text-align: center; }
+.pay-table td:nth-child(3),
+.pay-table td:nth-child(4),
+.pay-table td:nth-child(5) { text-align: center; }
+.pay-table .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.pay-table .pay-appointment-id {
+    color: var(--txt-md);
+    font-size: .78rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.pay-table .pay-date {
+    color: var(--txt-md);
+    font-size: .78rem;
+    white-space: nowrap;
+}
 .pay-cards { display: none; }
 
 /* Responsive */
@@ -103,13 +157,13 @@
     .unpaid-card .action button { margin-top: 0 !important; }
 }
 
-@media (max-width: 600px) {
-    /* Hide table, show cards on small screens */
+@media (max-width: 1100px) {
+    /* Switch to cards before the table becomes cramped. */
     .pay-table-wrap { display: none !important; }
     .pay-cards { display: block; }
 
     .pay-card {
-        padding: 14px 16px; border-bottom: 1px solid var(--warm-bd);
+        padding: 16px 18px; border-bottom: 1px solid var(--warm-bd);
     }
     .pay-card:last-child { border-bottom: 0; }
     .pay-card .row1 {
@@ -129,7 +183,7 @@
         display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     }
     .pay-card .apt-no {
-        font-family: monospace; color: var(--txt-md);
+        font-family: monospace; color: var(--txt-md); overflow-wrap: anywhere;
     }
     .pay-card .row3 {
         display: flex; align-items: center; justify-content: space-between;
@@ -235,7 +289,7 @@
 <div class="panel" style="padding:0;overflow:hidden">
 
     {{-- Desktop / tablet table --}}
-    <div class="pay-table-wrap" style="overflow-x:auto">
+    <div class="pay-table-wrap">
         <table class="pay-table">
             <thead><tr>
                 <th>Doctor</th>
@@ -255,7 +309,9 @@
                     @endif
                 </td>
                 <td style="font-size:.8rem;color:var(--txt-md)">
+                    <div class="pay-appointment-id">
                     {{ $pay->appointment?->appointment_number ?? '—' }}
+                    </div>
                     @if($pay->appointment?->slot_datetime)
                     <div style="font-size:.7rem;color:var(--txt-lt)">{{ $pay->appointment->slot_datetime->format('d M Y') }}</div>
                     @endif
@@ -268,7 +324,7 @@
                         {{ ucfirst($pay->status) }}
                     </span>
                 </td>
-                <td style="font-size:.75rem;color:var(--txt-lt);white-space:nowrap">
+                <td class="pay-date">
                     {{ $pay->paid_at ? $pay->paid_at->format('d M Y') : $pay->created_at->format('d M Y') }}
                 </td>
                 <td style="text-align:right">
