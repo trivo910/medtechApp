@@ -68,4 +68,13 @@ class Prescription extends Model
     // ─── Scopes ──────────────────────────────────────────────────────────────
 
     public function scopeIssued($query) { return $query->where('status', 'issued'); }
+
+    public function scopeForAppointmentPatient($query, Appointment $appointment)
+    {
+        return $query->issued()
+            ->where('doctor_user_id', $appointment->doctor_user_id)
+            ->where('patient_user_id', $appointment->patient_user_id)
+            ->where('family_member_id', $appointment->family_member_id)
+            ->whereDate('prescribed_date', '<=', min(today()->toDateString(), $appointment->slot_datetime->toDateString()));
+    }
 }

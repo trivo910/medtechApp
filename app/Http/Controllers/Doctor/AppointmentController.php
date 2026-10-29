@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Doctor;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Payment;
+use App\Models\Prescription;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -93,7 +94,15 @@ class AppointmentController extends Controller
     {
         $this->gate($appointment);
         $appointment->load(['patient.profile', 'doctor.profile', 'doctor.doctorProfile', 'familyMember']);
-        return view('doctor.appointments.show', compact('appointment'));
+        $previousPrescriptions = Prescription::forAppointmentPatient($appointment)
+            ->with('medicines')
+            ->orderByDesc('prescribed_date')
+            ->orderByDesc('id')
+            ->paginate(5, ['*'], 'prescriptions_page')
+            ->withQueryString()
+            ->fragment('previous-prescriptions');
+
+        return view('doctor.appointments.show', compact('appointment', 'previousPrescriptions'));
     }
 
     // ── Confirm ──────────────────────────────────────────────────────────────

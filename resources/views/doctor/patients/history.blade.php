@@ -7,6 +7,13 @@
 @endsection
 
 @section('content')
+<div style="margin-bottom:16px">
+    <a href="{{ route('doctor.patients.index') }}"
+       onclick="if (window.history.length > 1) { window.history.back(); return false; }"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;font-size:.85rem">
+        <span aria-hidden="true">&larr;</span> Back
+    </a>
+</div>
 @php
     $name     = $patient->profile?->full_name ?? 'Unknown';
     $colors   = ['#3d7a6e','#7a6e3d','#6e3d7a','#3d607a','#7a3d4a'];

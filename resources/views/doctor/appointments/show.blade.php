@@ -67,12 +67,12 @@
             </div>
         </div>
         @if($member)
-        <a href="{{ route('doctor.patients.show', [$patient->id, 'member' => $member->id]) }}"
+        <a href="{{ route('doctor.patients.show', [$patient->id, 'member' => $member->id, 'tab' => 'prescriptions']) }}"
            style="margin-left:auto;font-size:.8rem;padding:6px 14px;border:1.5px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;white-space:nowrap">
             View {{ $member->full_name }}
         </a>
         @else
-        <a href="{{ route('doctor.patients.show', $patient) }}"
+        <a href="{{ route('doctor.patients.show', [$patient->id, 'tab' => 'prescriptions']) }}"
            style="margin-left:auto;font-size:.8rem;padding:6px 14px;border:1.5px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;white-space:nowrap">
             View Patient
         </a>
@@ -117,7 +117,7 @@
 
 {{-- Actions --}}
 @if(!in_array($appointment->status, ['completed','cancelled']))
-<div style="background:var(--cream);border:1px solid var(--warm-bd);border-radius:14px;padding:18px 20px;display:flex;gap:10px;flex-wrap:wrap">
+<div style="background:var(--cream);border:1px solid var(--warm-bd);border-radius:14px;padding:18px 20px;display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
     @if($appointment->status === 'pending')
     <form method="POST" action="{{ route('doctor.appointments.confirm', $appointment) }}">
         @csrf
@@ -135,6 +135,8 @@
        style="padding:9px 18px;background:var(--leaf);color:#fff;border-radius:10px;font-size:.875rem;font-weight:600;text-decoration:none">Write Prescription</a>
 </div>
 @endif
+
+@include('doctor.appointments._previous-prescriptions')
 
 </div>
 
