@@ -197,7 +197,7 @@ $specMeta = TimelineTemplate::SPECIALTIES;
                                 style="width:100%;padding:.55rem .8rem;border:1.5px solid var(--warm-bd);border-radius:9px;font-size:.875rem;color:var(--txt);background:#fff;outline:none;font-family:inherit">
                             <option value="">{{ $patient->profile?->full_name ?? 'Patient' }} (self)</option>
                             @foreach($patient->familyMembers as $fm)
-                            <option value="{{ $fm->id }}">{{ $fm->full_name }} ({{ $fm->relation }})</option>
+                            <option value="{{ $fm->id }}" @selected((string) old('family_member_id', request('member')) === (string) $fm->id)>{{ $fm->full_name }} ({{ $fm->relation }})</option>
                             @endforeach
                         </select>
                     </div>

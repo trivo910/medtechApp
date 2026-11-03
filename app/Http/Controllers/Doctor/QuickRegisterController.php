@@ -124,14 +124,18 @@ class QuickRegisterController extends Controller
         $selfSubId = $patient->familyMembers->firstWhere('relation', 'self')?->sub_id;
         $doctorFee = auth()->user()->doctorProfile?->consultation_fee ?? 0;
 
-        return view('doctor.quick-register.success', compact('patient', 'selfSubId', 'doctorFee'));
+        // An unfinished visit today means "Start Visit Now" must not create another one
+        $activeVisit = $this->activeVisitFor($patient->id);
+
+        return view('doctor.quick-register.success', compact('patient', 'selfSubId', 'doctorFee', 'activeVisit'));
     }
 
     // Step 6: optional button — create an immediate appointment for this walk-in.
     public function startVisit(Request $request, int $patient)
     {
         $request->validate([
-            'reason' => ['nullable', 'string', 'max:500'],
+            'reason'           => ['nullable', 'string', 'max:500'],
+            'family_member_id' => ['nullable', 'integer', 'exists:family_members,id'],
         ]);
 
         $patient = User::where('id', $patient)
@@ -141,26 +145,60 @@ class QuickRegisterController extends Controller
         $doctor  = auth()->user();
         $profile = $doctor->doctorProfile;
 
-        $appointment = Appointment::create([
-            'doctor_user_id'    => $doctor->id,
-            'patient_user_id'   => $patient->id,
-            'slot_datetime'     => now(),
-            'duration_minutes'  => config('medtech.appointment.default_duration', 15),
-            'type'              => 'in_person',
-            'status'            => 'booked',
-            'reason'            => $request->input('reason'),
-            'fee'               => $profile->consultation_fee ?? 0,
-            'payment_status'    => 'pending',
-            'payment_preference'=> 'cash',
-        ]);
+        // A walk-in can be for a dependent; only accept members of this patient.
+        $memberId = null;
+        if ($request->filled('family_member_id')) {
+            $memberId = FamilyMember::where('id', $request->family_member_id)
+                ->where('primary_user_id', $patient->id)
+                ->where('is_delinked', false)
+                ->value('id');
+        }
+
+        // Starting a visit twice (double click, back button, repeated taps) must
+        // open the visit already in progress instead of creating a duplicate.
+        // The user row is locked so two parallel requests cannot both insert.
+        $result = DB::transaction(function () use ($patient, $doctor, $profile, $request, $memberId) {
+            User::whereKey($patient->id)->lockForUpdate()->first();
+
+            if ($active = $this->activeVisitFor($patient->id, $memberId)) {
+                return ['appointment' => $active, 'created' => false];
+            }
+
+            return [
+                'appointment' => Appointment::create([
+                    'doctor_user_id'    => $doctor->id,
+                    'patient_user_id'   => $patient->id,
+                    'family_member_id'  => $memberId,
+                    'slot_datetime'     => now(),
+                    'duration_minutes'  => config('medtech.appointment.default_duration', 15),
+                    'type'              => 'in_person',
+                    'status'            => 'confirmed',
+                    'reason'            => $request->input('reason'),
+                    'fee'               => $profile->consultation_fee ?? 0,
+                    'payment_status'    => 'pending',
+                    'payment_preference'=> 'cash',
+                ]),
+                'created' => true,
+            ];
+        });
 
         return redirect()
-            ->route('doctor.appointments.show', $appointment)
-            ->with('success', 'Visit started. You can complete it after the consultation.');
+            ->route('doctor.appointments.show', $result['appointment'])
+            ->with(
+                'success',
+                $result['created']
+                    ? 'Visit started. You can complete it after the consultation.'
+                    : 'A visit is already in progress for this patient. Complete it before starting another.'
+            );
+    }
+
+    // ── Private: today's unfinished visit for this patient, if any ───────────
+    private function activeVisitFor(int $patientId, ?int $familyMemberId = null): ?Appointment
+    {
+        return Appointment::openVisitToday(auth()->id(), $patientId, $familyMemberId)->first();
     }
 
     // ── Private: grant doctor direct access to patient ────────────────────────
-
     private function grantDoctorAccess(User $patient): void
     {
         $doctor = auth()->user();

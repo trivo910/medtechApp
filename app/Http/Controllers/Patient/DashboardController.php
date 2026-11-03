@@ -45,12 +45,13 @@ class DashboardController extends Controller
         // ── Family members ───────────────────────────────────────────────────
         $familyMembers = $patient->familyMembers()
             ->where('is_delinked', false)
+            ->where('relation', '!=', 'self')
             ->orderBy('relation')
             ->get();
 
         // ── Active medication reminders ──────────────────────────────────────
         $activeMeds = MedicationReminder::where('patient_user_id', $patient->id)
-            ->where('is_active', true)
+            ->active()
             ->orderBy('medicine_name')
             ->limit(6)
             ->get();

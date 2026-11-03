@@ -92,6 +92,28 @@
 
             <div style="display:flex;gap:7px;flex-wrap:wrap">
                 @if($hasAccess)
+                @if($activeVisit)
+                <a href="{{ route('doctor.appointments.show', $activeVisit) }}"
+                   style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#0f766e;color:#fff;border-radius:9px;font-size:.8rem;font-weight:600;text-decoration:none">
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    Visit in Progress
+                </a>
+                @else
+                <form method="POST" action="{{ route('doctor.quick-register.start-visit', $patient->id) }}"
+                      style="display:flex"
+                      onsubmit="var b=this.querySelector('button[type=submit]');if(b){b.disabled=true;b.style.opacity='.6';b.textContent='Starting…';}">
+                    @csrf
+                    @if($viewingMember)
+                    <input type="hidden" name="family_member_id" value="{{ $viewingMember->id }}">
+                    @endif
+                    <button type="submit"
+                            style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#16a34a;color:#fff;border:none;border-radius:9px;font-size:.8rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s"
+                            onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Start Visit
+                    </button>
+                </form>
+                @endif
                 <a href="{{ route('doctor.prescriptions.create', ['patient' => $patient->id]) }}"
                    style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--ink);color:#fff;border-radius:9px;font-size:.8rem;font-weight:600;text-decoration:none">
                     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>

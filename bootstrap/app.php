@@ -32,6 +32,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/admin.php'));
         },
     )
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+        $schedule->call(fn() => app(\App\Services\PrescriptionReminderService::class)->sendDue())
+            ->name('prescription-medication-reminders')->everyMinute()->withoutOverlapping();
+    })
     ->withMiddleware(function (Middleware $middleware) {
 
         // ── Global web middleware ────────────────────────────────────────────

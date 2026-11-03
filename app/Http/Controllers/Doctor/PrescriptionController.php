@@ -140,6 +140,8 @@ class PrescriptionController extends Controller
                 ]);
             }
 
+            app(\App\Services\PrescriptionReminderService::class)->createForPrescription($rx);
+
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();

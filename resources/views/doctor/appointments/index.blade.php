@@ -95,21 +95,22 @@
             {{-- Confirm button (booked only) --}}
             @if($apt->status === 'booked')
             <button type="button"
+                    class="apt-confirm-btn"
                     @click="
                         processing='{{ $apt->id }}';
                         fetch('{{ route('doctor.appointments.confirm', $apt) }}', {method:'POST',headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}})
                         .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); }).finally(()=>processing=null)"
-                    :disabled="processing==='{{ $apt->id }}'"
-                    style="font-size:.75rem;font-weight:600;padding:6px 11px;background:var(--leaf);color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s;display:flex;align-items:center;gap:4px"
-                    :style="processing==='{{ $apt->id }}' ? 'opacity:.5' : ''">
-                <span x-show="processing==='{{ $apt->id }}'" style="width:11px;height:11px;border:1.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite"></span>
-                Confirm
+                    :disabled="processing==='{{ $apt->id }}'">
+                <span class="apt-confirm-spinner" x-show="processing==='{{ $apt->id }}'"></span>
+                <svg class="apt-confirm-icon" x-show="processing!=='{{ $apt->id }}'" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="processing==='{{ $apt->id }}' ? 'Confirming…' : 'Confirm'"></span>
             </button>
             @endif
 
             {{-- Complete button (confirmed/booked + past) --}}
             @if(in_array($apt->status, ['booked','confirmed']) && $apt->slot_datetime->isPast())
             <button type="button"
+                    class="apt-confirm-btn"
                     @click="
                         processing='{{ $apt->id }}c';
                         fetch('{{ route('doctor.appointments.complete', $apt) }}', {method:'POST',headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}})
@@ -146,5 +147,53 @@
 </div>
 @endsection
 @push('styles')
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Light "Confirm" action button ─────────────────────────────────────── */
+.apt-confirm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 13px;
+    background: #fff;
+    color: var(--txt-md, #4a5a58);
+    border: 1.5px solid var(--warm-bd);
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: .75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .13s, border-color .13s, color .13s, box-shadow .13s;
+}
+.apt-confirm-btn:hover:not(:disabled) {
+    background: #edf6f4;
+    border-color: #b8dbd7;
+    color: var(--leaf, #3d7a6e);
+    box-shadow: 0 1px 4px rgba(61, 122, 110, .12);
+}
+.apt-confirm-btn:active:not(:disabled) { transform: translateY(1px); }
+.apt-confirm-btn:focus-visible {
+    outline: 2px solid var(--leaf, #3d7a6e);
+    outline-offset: 2px;
+}
+.apt-confirm-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.apt-confirm-icon,
+.apt-confirm-spinner { flex-shrink: 0; }
+.apt-confirm-spinner {
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid rgba(61, 122, 110, .3);
+    border-top-color: var(--leaf, #3d7a6e);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+}
+</style>
 @endpush

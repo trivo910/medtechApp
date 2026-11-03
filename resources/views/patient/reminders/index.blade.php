@@ -84,7 +84,7 @@ input:checked + .toggle-track::before { transform: translateX(16px); }
     @foreach($active as $rem)
     @php
         $chanIcon = match($rem->channel) { 'whatsapp'=>'💬', 'sms'=>'📱', default=>'🔔' };
-        $chanLabel= match($rem->channel) { 'whatsapp'=>'WhatsApp', 'sms'=>'SMS', default=>'Both' };
+        $chanLabel= match($rem->channel) { 'whatsapp'=>'WhatsApp', 'sms'=>'SMS', 'in_app'=>'In-app', default=>'Both' };
         $daysLeft = $rem->end_date ? today()->diffInDays($rem->end_date, false) : null;
     @endphp
     <div class="panel rem-card" style="padding:16px 20px" x-data="{ toggling: false }">
@@ -113,6 +113,25 @@ input:checked + .toggle-track::before { transform: translateX(16px); }
                     </label>
                 </div>
 
+                @if($rem->prescriptionMedicine)
+                <p style="font-size:.78rem;margin-top:8px">
+                    {{ $rem->prescriptionMedicine->frequency }} · {{ str_replace('_', ' ', $rem->prescriptionMedicine->timing) }}
+                    @if($rem->interval_days === 7) · Weekly from {{ $rem->start_date->format('l') }} @endif
+                    @if($rem->start_date->gt(today())) · Starts {{ $rem->start_date->format('d M Y') }} @endif
+                    <br>{{ $rem->prescriptionMedicine->special_instructions }}
+                </p>
+                <details style="font-size:.78rem;margin-top:8px">
+                    <summary>Adjust notification times</summary>
+                    <p>Suggested alert times. Follow the prescription's dose and food instructions.</p>
+                    <form method="POST" action="{{ route('patient.reminders.update', $rem) }}">
+                        @csrf @method('PUT')
+                        @foreach($rem->reminder_times as $time)
+                        <input type="time" name="reminder_times[]" value="{{ $time }}" required aria-label="Notification time">
+                        @endforeach
+                        <button type="submit">Save times</button>
+                    </form>
+                </details>
+                @endif
                 {{-- Reminder times --}}
                 <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px">
                     @foreach($rem->reminder_times ?? [] as $t)
@@ -128,17 +147,17 @@ input:checked + .toggle-track::before { transform: translateX(16px); }
 
                 {{-- Date range + days left --}}
                 <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;color:var(--txt-lt)">
-                    <span>Started {{ $rem->start_date->format('d M Y') }}</span>
+                    <span>{{ $rem->start_date->gt(today()) ? 'Starts' : 'Started' }} {{ $rem->start_date->format('d M Y') }}</span>
                     @if($rem->end_date)
                     <span style="color:{{ $daysLeft <= 3 ? 'var(--rose)' : 'inherit' }};font-weight:{{ $daysLeft <= 3 ? '600' : '400' }}">
-                        Ends {{ $rem->end_date->format('d M Y') }}
+                        Ends {{ $rem->end_date->format('d M Y') }} (inclusive)
                         @if($daysLeft !== null) ({{ $daysLeft }}d left) @endif
                     </span>
                     @else
                     <span>No end date</span>
                     @endif
                     @if($rem->prescription)
-                    <span>📋 From prescription {{ $rem->prescription->rx_number }}</span>
+                    <span>📋 From prescription {{ $rem->prescription->prescription_number }}</span>
                     @endif
                 </div>
             </div>
@@ -172,12 +191,22 @@ input:checked + .toggle-track::before { transform: translateX(16px); }
             <div style="flex:1;min-width:0">
                 <div style="font-size:.8125rem;font-weight:500;color:var(--txt-md)">{{ $rem->medicine_name }}</div>
                 <div style="font-size:.72rem;color:var(--txt-lt)">{{ $rem->dosage }}
-                    @if($rem->end_date && $rem->end_date->isPast()) · Ended {{ $rem->end_date->format('d M Y') }}@endif
+                    @if($rem->end_date && $rem->end_date->lt(today())) · Ended {{ $rem->end_date->format('d M Y') }}@endif
+                    @if($rem->schedule_note)<br>{{ $rem->schedule_note }}@endif
+                    @if($rem->prescriptionMedicine)
+                        <br>{{ $rem->prescriptionMedicine->frequency }} · {{ $rem->prescriptionMedicine->special_instructions }}
+                    @endif
                 </div>
             </div>
             <span style="font-size:.68rem;padding:2px 8px;border-radius:20px;background:var(--sand);color:var(--txt-lt);font-weight:600">
-                {{ $rem->is_active ? 'Expired' : 'Paused' }}
+                {{ $rem->schedule_note ? 'Needs review / As needed' : ($rem->end_date?->lt(today()) ? 'Completed' : ($rem->prescription_id && $rem->prescription?->status !== 'issued' ? 'Stopped' : 'Paused')) }}
             </span>
+            @if(!$rem->is_active && !$rem->schedule_note && (!$rem->end_date || $rem->end_date->gte(today())) && (!$rem->prescription_id || $rem->prescription?->status === 'issued'))
+            <form method="POST" action="{{ route('patient.reminders.toggle', $rem) }}">
+                @csrf
+                <button type="submit">Resume reminders</button>
+            </form>
+            @endif
         </div>
         @endforeach
     </div>

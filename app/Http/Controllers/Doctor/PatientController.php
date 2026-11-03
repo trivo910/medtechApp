@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Doctor;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\FamilyMember;
+use App\Models\Appointment;
 use App\Models\DoctorAccessRequest;
 use App\Models\MedicalRecord;
 use App\Models\Prescription;
@@ -54,9 +55,10 @@ class PatientController extends Controller
 
         // Search
         if ($search = $request->get('q')) {
-            $query->whereHas('profile', function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%");
-            })->orWhere('mobile_number', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('profile', fn($p) => $p->where('full_name', 'like', "%{$search}%"))
+                  ->orWhere('mobile_number', 'like', "%{$search}%");
+            });
         }
 
         // Filter
@@ -128,10 +130,16 @@ class PatientController extends Controller
                     'city'   => $p->profile?->city,
                 ])->values();
 
+                $first = $patients->first();
+
                 return response()->json([
-                    'found'    => true,
-                    'patient'  => $list->first(),
-                    'patients' => $list,
+                    'found'           => true,
+                    'patient'         => $list->first(),
+                    'patients'        => $list,
+                    // Resolved identifier — the typed query may have been a name,
+                    // which the access-request lookup cannot resolve on its own.
+                    'identifier'      => $first->mobile_number,
+                    'identifier_type' => 'mobile',
                 ]);
             }
         }
@@ -177,15 +185,45 @@ class PatientController extends Controller
     public function requestAccess(Request $request)
     {
         $request->validate([
-            'identifier'      => ['required', 'string', 'min:3'],
-            'identifier_type' => ['required', 'in:mobile,sub_id,aadhaar'],
+            'identifier'       => ['required', 'string', 'min:3'],
+            'identifier_type'  => ['required', 'in:mobile,sub_id,aadhaar'],
+            'patient_id'       => ['nullable', 'integer', 'exists:users,id'],
+            'family_member_id' => ['nullable', 'integer', 'exists:family_members,id'],
         ]);
 
         $doctor = auth()->user();
+
+        // The modal already resolved the patient from search — use that instead
+        // of re-parsing a typed name/mobile, which fails the strict lookup.
+        $patient = null;
+        $member  = null;
+
+        if ($request->filled('patient_id')) {
+            $patient = User::where('id', $request->patient_id)
+                ->where('role', 'patient')
+                ->first();
+
+            if (! $patient) {
+                $error = ['status' => 'error', 'message' => 'No patient found with that identifier.'];
+
+                return $request->expectsJson()
+                    ? response()->json($error, 404)
+                    : back()->withErrors(['identifier' => $error['message']]);
+            }
+
+            if ($request->filled('family_member_id')) {
+                $member = FamilyMember::where('id', $request->family_member_id)
+                    ->where('primary_user_id', $patient->id)
+                    ->first();
+            }
+        }
+
         $result = $this->accessControl->raiseRequest(
             $doctor,
             $request->identifier,
-            $request->identifier_type
+            $request->identifier_type,
+            $patient,
+            $member
         );
 
         if ($request->expectsJson()) {
@@ -326,6 +364,11 @@ class PatientController extends Controller
                 ->get()
             : collect();
 
+        // ── Today's open walk-in visit (drives the Start Visit / Visit in progress action) ──
+        $activeVisit = $hasAccess
+            ? Appointment::openVisitToday($doctor->id, $patientId, $viewingMember?->id)->first()
+            : null;
+
         // ── Summary stats ─────────────────────────────────────────────────────
         $stats = $hasAccess ? [
             'total_visits'   => MedicalRecord::where('patient_user_id', $patientId)->count(),
@@ -340,7 +383,7 @@ class PatientController extends Controller
             'hasAccess', 'pendingReq', 'accessGrant',
             'viewingMember', 'familyMemberId',
             'records', 'prescriptions',
-            'vitalsData', 'timelines', 'stats', 'patientDocuments'
+            'vitalsData', 'timelines', 'stats', 'patientDocuments', 'activeVisit'
         ));
     }
 }

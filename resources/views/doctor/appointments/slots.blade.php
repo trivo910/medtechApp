@@ -204,12 +204,12 @@
     </div>
 
     <button type="button"
+            class="dr-save-btn"
             @click="submitForm()"
             :disabled="saving || hasErrors()"
-            style="width:100%;padding:.85rem 1rem;background:#2d2d2d;color:#fff;border:none;border-radius:11px;font-size:.9375rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s;box-shadow:0 2px 8px rgba(0,0,0,.18)"
-            :style="(saving || hasErrors()) ? 'opacity:.5;cursor:not-allowed' : 'opacity:1'"
-            onmouseover="if(!this.disabled) this.style.opacity='.82'" onmouseout="if(!this.disabled) this.style.opacity='1'">
-        <span x-show="saving" style="width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0"></span>
+            :class="{ 'is-busy': saving, 'is-blocked': hasErrors() }">
+        <span class="dr-save-spinner" x-show="saving"></span>
+        <svg class="dr-save-icon" x-show="!saving && !hasErrors()" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
         <span x-show="!saving && !hasErrors()">Save Availability</span>
         <span x-show="!saving && hasErrors()">Fix time errors first</span>
         <span x-show="saving">Saving…</span>
@@ -475,6 +475,58 @@
 @push('styles')
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Save Availability button (right sidebar) ─────────────────────────── */
+.dr-save-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: .85rem 1rem;
+    background: var(--ink, #1c2b2a);
+    color: #fff;
+    border: none;
+    border-radius: 11px;
+    font-family: 'Outfit', sans-serif;
+    font-size: .9375rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(28, 43, 42, .22);
+    transition: opacity .15s, box-shadow .15s, transform .12s;
+}
+.dr-save-btn:hover:not(:disabled) {
+    opacity: .88;
+    box-shadow: 0 4px 16px rgba(28, 43, 42, .28);
+}
+.dr-save-btn:active:not(:disabled) { transform: translateY(1px); }
+.dr-save-btn:focus-visible {
+    outline: 2px solid var(--leaf, #3d7a6e);
+    outline-offset: 2px;
+}
+.dr-save-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.dr-save-btn.is-blocked {
+    background: #8a4b4f;
+    box-shadow: 0 2px 10px rgba(138, 75, 79, .22);
+}
+.dr-save-btn.is-busy { cursor: progress; }
+.dr-save-icon { flex-shrink: 0; }
+.dr-save-spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255, 255, 255, .3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    flex-shrink: 0;
+}
+
 @media (max-width: 640px) {
     .dr-day-row { flex-wrap: wrap; }
     .dr-block-form-grid { grid-template-columns: 1fr !important; }

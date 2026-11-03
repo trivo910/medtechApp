@@ -86,8 +86,22 @@
     <div style="display:flex;flex-direction:column;gap:9px">
 
         {{-- Step 6: Start Visit Now — creates a real appointment for this patient --}}
-        @if($doctorFee > 0)
-        <form method="POST" action="{{ route('doctor.quick-register.start-visit', $patient->id) }}">
+        @if($activeVisit ?? null)
+        <a href="{{ route('doctor.appointments.show', $activeVisit) }}"
+           style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#0f766e;color:#fff;border-radius:12px;text-decoration:none;transition:opacity .15s;box-shadow:0 2px 8px rgba(15,118,110,.25)"
+           onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+            <div style="display:flex;align-items:center;gap:10px;text-align:left">
+                <span style="font-size:1.3rem">🩺</span>
+                <div>
+                    <div style="font-weight:600;font-size:.9rem">Visit in progress</div>
+                    <div style="font-size:.72rem;opacity:.8">Appointment #{{ $activeVisit->id }} · open to continue or mark complete</div>
+                </div>
+            </div>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        @elseif($doctorFee > 0)
+        <form method="POST" action="{{ route('doctor.quick-register.start-visit', $patient->id) }}"
+              onsubmit="var b=this.querySelector('button[type=submit]');if(b){b.disabled=true;b.style.opacity='.6';b.querySelector('[data-start-label]').textContent='Starting…';}">
             @csrf
             <button type="submit"
                     style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#16a34a;color:#fff;border:none;border-radius:12px;text-decoration:none;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s;box-shadow:0 2px 8px rgba(22,163,74,.25)"
@@ -95,7 +109,7 @@
                 <div style="display:flex;align-items:center;gap:10px;text-align:left">
                     <span style="font-size:1.3rem">🚶</span>
                     <div>
-                        <div style="font-weight:600;font-size:.9rem">Start Visit Now</div>
+                        <div style="font-weight:600;font-size:.9rem" data-start-label>Start Visit Now</div>
                         <div style="font-size:.72rem;opacity:.8">Create appointment · ₹{{ number_format($doctorFee, 0) }} fee · unpaid</div>
                     </div>
                 </div>
@@ -103,9 +117,6 @@
             </button>
         </form>
         @endif
-
-        <a href="{{ route('doctor.records.create', $patient->id) }}"
-    <div style="display:flex;flex-direction:column;gap:9px">
 
         <a href="{{ route('doctor.records.create', $patient->id) }}"
            style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--leaf);color:#fff;border-radius:12px;text-decoration:none;transition:opacity .15s"

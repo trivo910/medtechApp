@@ -94,7 +94,7 @@
         </div>
         <div>
             <div style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-lt);margin-bottom:4px">Type</div>
-            <div style="font-size:.9rem;color:var(--txt)">{{ ucfirst($appointment->visit_type ?? 'in_person') }}</div>
+            <div style="font-size:.9rem;color:var(--txt)">{{ ucfirst($appointment->type ?? 'in_person') }}</div>
         </div>
         <div>
             <div style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-lt);margin-bottom:4px">Booked</div>
@@ -118,14 +118,16 @@
 {{-- Actions --}}
 @if(!in_array($appointment->status, ['completed','cancelled']))
 <div style="background:var(--cream);border:1px solid var(--warm-bd);border-radius:14px;padding:18px 20px;display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-    @if($appointment->status === 'pending')
+    @if($appointment->status === 'booked')
     <form method="POST" action="{{ route('doctor.appointments.confirm', $appointment) }}">
         @csrf
         <button type="submit" style="padding:9px 18px;background:var(--ink);color:#fff;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">Confirm</button>
     </form>
     @endif
-    @if(in_array($appointment->status, ['pending','confirmed']))
+    @if(in_array($appointment->status, ['booked','confirmed']))
+    @if($appointment->slot_datetime?->isPast())
     <button type="button" onclick="handleMarkComplete(this, {{ $appointment->id }})" style="padding:9px 18px;background:#16a34a;color:#fff;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">Mark Complete</button>
+    @endif
     <form method="POST" action="{{ route('doctor.appointments.cancel', $appointment) }}" onsubmit="return confirm('Cancel this appointment?')">
         @csrf
         <button type="submit" style="padding:9px 18px;background:transparent;color:#ef4444;border:1.5px solid #ef4444;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">Cancel</button>
@@ -152,6 +154,7 @@
             <div><span style="color:var(--txt-lt)">Slot</span><br><span style="font-weight:500">{{ $appointment->slot_datetime?->format('D, d M Y') }}<br>{{ $appointment->slot_datetime?->format('h:i A') }}</span></div>
         </div>
     </div>
+    @include('doctor.appointments._assign-timeline')
 </div>
 
 </div>

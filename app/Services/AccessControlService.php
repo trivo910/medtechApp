@@ -42,12 +42,24 @@ class AccessControlService
      * If patient is on full access → approve immediately.
      * If OTP required → create pending request and notify patient.
      *
+     * Pass $patient (and optionally $familyMember) when the patient has
+     * already been resolved, e.g. by the doctor's search step.
+     *
      * Returns ['status' => 'approved'|'pending'|'error', 'message' => string]
      */
-    public function raiseRequest(User $doctor, string $identifier, string $identifierType): array
-    {
-        // Find the patient
-        $result = $this->findPatient($identifier, $identifierType);
+    public function raiseRequest(
+        User $doctor,
+        string $identifier,
+        string $identifierType,
+        ?User $patient = null,
+        ?FamilyMember $familyMember = null,
+    ): array {
+        // Find the patient unless it was already resolved upstream
+        if ($patient) {
+            $result = ['found' => true, 'user' => $patient, 'member' => $familyMember];
+        } else {
+            $result = $this->findPatient($identifier, $identifierType);
+        }
 
         if (! $result['found']) {
             return ['status' => 'error', 'message' => 'No patient found with that identifier.'];

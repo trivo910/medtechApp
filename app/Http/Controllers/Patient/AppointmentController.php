@@ -156,7 +156,7 @@ class AppointmentController extends Controller
 
         $patient       = auth()->user();
         $familyMember  = null;
-        $familyMembers = $patient->familyMembers()->active()->orderBy('full_name')->get();
+        $familyMembers = $patient->familyMembers()->active()->where('relation', '!=', 'self')->orderBy('full_name')->get();
 
         return view('patient.appointments.book-slots', compact('doctor', 'patient', 'familyMember', 'familyMembers'));
     }
@@ -168,7 +168,7 @@ class AppointmentController extends Controller
 
         $patient       = auth()->user();
         $familyMember  = $patient->familyMembers()->where('id', $member)->firstOrFail();
-        $familyMembers = $patient->familyMembers()->active()->orderBy('full_name')->get();
+        $familyMembers = $patient->familyMembers()->active()->where('relation', '!=', 'self')->orderBy('full_name')->get();
 
         return view('patient.appointments.book-slots', compact('doctor', 'patient', 'familyMember', 'familyMembers'));
     }

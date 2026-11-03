@@ -111,12 +111,15 @@ class MedicationReminder extends Model
         'patient_user_id', 'family_member_id', 'prescription_id',
         'medicine_name', 'dosage', 'reminder_times',
         'start_date', 'end_date', 'is_active', 'channel',
+        'prescription_medicine_id', 'interval_days', 'schedule_note', 'last_notified_at',
     ];
 
     protected function casts(): array
     {
         return [
             'reminder_times' => 'array',
+            'last_notified_at' => 'datetime',
+            'interval_days' => 'integer',
             'start_date'     => 'date',
             'end_date'       => 'date',
             'is_active'      => 'boolean',
@@ -126,16 +129,23 @@ class MedicationReminder extends Model
     public function patient()      { return $this->belongsTo(User::class, 'patient_user_id'); }
     public function familyMember() { return $this->belongsTo(FamilyMember::class); }
     public function prescription() { return $this->belongsTo(Prescription::class); }
+    public function prescriptionMedicine() { return $this->belongsTo(PrescriptionMedicine::class); }
 
     public function isActive(): bool
     {
         return $this->is_active
-            && (!$this->end_date || $this->end_date->isFuture());
+            && !$this->schedule_note
+            && (!$this->start_date || $this->start_date->lte(today()))
+            && (!$this->end_date || $this->end_date->gte(today()))
+            && (!$this->prescription_id || $this->prescription?->status === 'issued');
     }
 
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
+                     ->whereNull('schedule_note')
+                     ->where(fn($q) => $q->whereNull('prescription_id')
+                         ->orWhereHas('prescription', fn($rx) => $rx->where('status', 'issued')))
                      ->where(fn($q) => $q->whereNull('end_date')
                                          ->orWhere('end_date', '>=', today()));
     }

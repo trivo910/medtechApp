@@ -109,4 +109,22 @@ class Appointment extends Model
     {
         return $query->where('doctor_user_id', $doctorId);
     }
+
+    /**
+     * The doctor's unfinished visit for a patient today (optionally scoped to a
+     * family member). Used to keep "Start Visit" idempotent.
+     */
+    public function scopeOpenVisitToday($query, int $doctorId, int $patientId, ?int $familyMemberId = null)
+    {
+        return $query->where('doctor_user_id', $doctorId)
+                     ->where('patient_user_id', $patientId)
+                     ->whereIn('status', ['booked', 'confirmed'])
+                     ->whereDate('slot_datetime', today())
+                     ->when(
+                         $familyMemberId === null,
+                         fn ($q) => $q->whereNull('family_member_id'),
+                         fn ($q) => $q->where('family_member_id', $familyMemberId)
+                     )
+                     ->latest('id');
+    }
 }

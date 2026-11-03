@@ -81,23 +81,46 @@ class TimelineController extends Controller
 
     public function assign(Request $request, int $patientId)
     {
-        // Access guard
-        $hasAccess = \App\Models\DoctorAccessRequest::where('doctor_user_id', auth()->id())
-            ->where('patient_user_id', $patientId)
-            ->where('status', 'approved')
-            ->exists();
+        $appointment = null;
+        if ($request->filled('appointment_id')) {
+            $request->validate(['appointment_id' => ['integer']]);
+            $appointment = \App\Models\Appointment::where('doctor_user_id', auth()->id())
+                ->where('patient_user_id', $patientId)->find($request->input('appointment_id'));
+            abort_unless($appointment, 404, 'This appointment is unavailable or does not belong to you and this patient. Refresh the appointment page or choose one of your own appointments.');
+            $request->merge(['family_member_id' => $appointment->family_member_id]);
+        }
 
-        abort_unless($hasAccess, 403, 'Access denied.');
+        // An owned appointment authorizes care for its patient. Standalone
+        // assignments still require an unexpired approved access request.
+        if (! $appointment) {
+            $hasAccess = \App\Models\DoctorAccessRequest::where('doctor_user_id', auth()->id())
+                ->where('patient_user_id', $patientId)->where('status', 'approved')
+                ->where(fn ($q) => $q->whereNull('access_expires_at')->orWhere('access_expires_at', '>', now()))
+                ->exists();
+            abort_unless($hasAccess, 403, 'Patient access is missing or has expired. Request patient access and ask the patient to approve it before assigning a timeline.');
+        }
 
         $request->validate([
             'template_id'      => ['required', 'exists:timeline_templates,id'],
             'start_date'       => ['required', 'date'],
-            'family_member_id' => ['nullable', 'exists:family_members,id'],
+            'family_member_id' => ['nullable', \Illuminate\Validation\Rule::exists('family_members', 'id')->where('primary_user_id', $patientId)],
             'custom_notes'     => ['nullable', 'string', 'max:1000'],
+        ], [
+            'template_id.required' => 'Select a timeline before assigning.',
+            'template_id.exists' => 'This template is no longer available. Refresh the page and select another timeline.',
+            'start_date.required' => 'Choose a start date for this timeline.',
+            'start_date.date' => 'Enter a valid start date.',
+            'family_member_id.exists' => 'The family member is no longer linked to this patient. Refresh the appointment and check the patient details.',
+            'custom_notes.max' => 'Shorten the notes to 1,000 characters or fewer.',
         ]);
 
         $patient  = User::findOrFail($patientId);
         $template = TimelineTemplate::findOrFail($request->template_id);
+        if (! $template->is_active || (! $template->is_system_template && $template->doctor_user_id != auth()->id())) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'template_id' => 'This timeline is inactive or unavailable to you. Refresh the page and select an active system template or one of your own templates.',
+            ]);
+        }
 
         // Calculate expected end date
         $startDate  = Carbon::parse($request->start_date);
@@ -118,6 +141,15 @@ class TimelineController extends Controller
             'is_active'             => true,
         ]);
         NotificationService::timelineAssigned($patientTimeline->load('template', 'assignedByDoctor.profile'));
+
+        if ($appointment && $request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => "\"{$template->title}\" assigned successfully."]);
+        }
+
+        if ($appointment) {
+            return redirect()->route('doctor.appointments.show', $appointment)
+                ->with('success', "\"{$template->title}\" assigned successfully.");
+        }
         
         return redirect()
             ->route('doctor.patients.history', $patientId)

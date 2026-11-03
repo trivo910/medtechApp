@@ -64,6 +64,15 @@
 @section('content')
 @php $editing = isset($record); @endphp
 
+<div style="margin-bottom:16px">
+    <a href="{{ route('doctor.patients.history', $patient->id) }}"
+       onclick="if (window.history.length > 1) { window.history.back(); return false; }"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;font-size:.85rem;background:transparent;transition:background .12s"
+       onmouseover="this.style.background='var(--parch)'" onmouseout="this.style.background='transparent'">
+        <span aria-hidden="true">&larr;</span> Back
+    </a>
+</div>
+
 <div class="fade-in">
 <form method="POST"
       action="{{ $editing

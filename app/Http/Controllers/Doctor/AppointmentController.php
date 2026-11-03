@@ -9,6 +9,7 @@ use App\Models\Prescription;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Services\NotificationService;
 
 
@@ -102,7 +103,11 @@ class AppointmentController extends Controller
             ->withQueryString()
             ->fragment('previous-prescriptions');
 
-        return view('doctor.appointments.show', compact('appointment', 'previousPrescriptions'));
+        $timelineTemplates = \App\Models\TimelineTemplate::active()
+            ->where(fn ($q) => $q->where('is_system_template', true)->orWhere('doctor_user_id', auth()->id()))
+            ->withCount('milestones')->orderByDesc('is_system_template')->orderBy('title')->get();
+
+        return view('doctor.appointments.show', compact('appointment', 'previousPrescriptions', 'timelineTemplates'));
     }
 
     // ── Confirm ──────────────────────────────────────────────────────────────
@@ -117,7 +122,12 @@ class AppointmentController extends Controller
             $this->whatsApp->sendAppointmentConfirmation(
                 $appointment->load(['doctor.profile', 'patient.profile'])
             );
-        } catch (\Exception) {}
+        } catch (\Throwable $e) {
+            Log::warning('[WhatsApp] Confirmation message failed', [
+                'appointment' => $appointment->id,
+                'error'       => $e->getMessage(),
+            ]);
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'status' => 'confirmed']);
@@ -258,7 +268,12 @@ class AppointmentController extends Controller
             $this->whatsApp->sendAppointmentCancellation(
                 $appointment->load(['doctor.profile', 'patient.profile'])
             );
-        } catch (\Exception) {}
+        } catch (\Throwable $e) {
+            Log::warning('[WhatsApp] Cancellation message failed', [
+                'appointment' => $appointment->id,
+                'error'       => $e->getMessage(),
+            ]);
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['success' => true]);
@@ -313,7 +328,12 @@ class AppointmentController extends Controller
         // WhatsApp nudge (best-effort, never fail the request)
         try {
             $this->whatsApp->sendPaymentRequest($appointment);
-        } catch (\Exception) {}
+        } catch (\Throwable $e) {
+            Log::warning('[WhatsApp] Payment request failed', [
+                'appointment' => $appointment->id,
+                'error'       => $e->getMessage(),
+            ]);
+        }
 
         if ($request->expectsJson()) {
             return response()->json([

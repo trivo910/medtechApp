@@ -107,13 +107,13 @@
 
     <div class="dr-table-wrap patients-table-wrap">
     {{-- Table header --}}
-    <div class="dr-table-min" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:12px;padding:10px 20px;border-bottom:1px solid var(--warm-bd);font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-lt)">
+    <div class="dr-table-min" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:12px;padding:10px 20px;border-bottom:1px solid var(--warm-bd);font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-lt)">
         <span>Patient</span>
         <span>Mobile</span>
         <span>Last Visit</span>
         <span>Visits</span>
         <span>Access</span>
-        <span></span>
+        <span>Action</span>
     </div>
 
     @foreach($patients as $p)
@@ -276,6 +276,7 @@
 
                 <div style="position:relative;margin-bottom:12px">
                     <input x-model="searchQuery" type="text"
+                           @input="clearFound()"
                            :placeholder="searchType==='mobile' ? 'Enter 10-digit mobile number' : searchType==='sub_id' ? 'e.g. MED-00042-B' : 'Last 4 digits of Aadhaar'"
                            @keyup.enter="doSearch()"
                            style="width:100%;padding:.65rem 3rem .65rem .95rem;border:1.5px solid var(--warm-bd);border-radius:10px;font-size:.9375rem;color:var(--txt);outline:none;font-family:'Outfit',sans-serif;box-sizing:border-box"
@@ -385,6 +386,8 @@ function patientList() {
         searchError: '',
         foundPatient:null,
         foundMember: null,
+        resolvedIdentifier: null,
+        resolvedType: null,
         pendingReqId:null,
         otpDigits:   ['','','','','',''],
         otpError:    '',
@@ -405,10 +408,21 @@ function patientList() {
             this.searchQuery = '';
             this.foundPatient= null;
             this.foundMember = null;
+            this.resolvedIdentifier = null;
+            this.resolvedType = null;
             this.searchError = '';
             this.otpDigits   = ['','','','','',''];
             this.otpError    = '';
             this.pendingReqId= null;
+        },
+
+        // Typing after a successful search invalidates the found patient
+        clearFound() {
+            this.foundPatient = null;
+            this.foundMember  = null;
+            this.resolvedIdentifier = null;
+            this.resolvedType = null;
+            this.searchError  = '';
         },
 
         async doSearch() {
@@ -417,7 +431,10 @@ function patientList() {
                 await this.raiseRequest();
                 return;
             }
-            if (this.searchQuery.length < 3) return;
+            if (this.searchQuery.length < 3) {
+                this.searchError = 'Enter at least 3 characters (mobile, Sub-ID, Aadhaar or name).';
+                return;
+            }
             this.searching   = true;
             this.searchError = '';
             try {
@@ -427,8 +444,16 @@ function patientList() {
                 const data = await res.json();
                 if (data.found) {
                     this.foundPatient = data.patient;
-                    this.foundMember  = data.family_member;
+                    this.foundMember  = data.family_member || null;
+                    // Use the identifier the server resolved, not the raw query
+                    this.resolvedIdentifier = data.identifier || data.patient?.mobile || this.searchQuery;
+                    this.resolvedType       = data.identifier_type || this.searchType;
+                    this.searchError        = '';
                 } else {
+                    this.foundPatient = null;
+                    this.foundMember  = null;
+                    this.resolvedIdentifier = null;
+                    this.resolvedType = null;
                     this.searchError = data.message || 'No patient found with that identifier.';
                 }
             } catch(e) {
@@ -439,12 +464,18 @@ function patientList() {
         },
 
         async raiseRequest() {
-            this.searching = true;
+            this.searching   = true;
+            this.searchError = '';
             try {
                 const res  = await fetch('{{ route('doctor.patients.request-access') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                    body: JSON.stringify({ identifier: this.searchQuery, identifier_type: this.searchType })
+                    body: JSON.stringify({
+                        identifier:       this.resolvedIdentifier || this.searchQuery,
+                        identifier_type:  this.resolvedType || this.searchType,
+                        patient_id:       this.foundPatient?.id ?? null,
+                        family_member_id: this.foundMember?.id ?? null,
+                    })
                 });
                 const data = await res.json();
 

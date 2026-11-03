@@ -59,6 +59,29 @@ class WhatsAppService
         return $this->send($patient->full_mobile, $message);
     }
 
+    public function sendAppointmentCancellation(Appointment $appointment): bool
+    {
+        $patient    = $appointment->patient;
+        $doctor     = $appointment->doctor;
+        $doctorName = $doctor?->profile?->full_name ?? 'your doctor';
+        $dateTime   = $appointment->slot_datetime?->format('D, d M Y \a\t h:i A') ?? '';
+        $clinic     = $doctor?->doctorProfile?->clinic_name ?? 'the clinic';
+        $reason     = $appointment->cancellation_reason;
+
+        $message = "❌ *Appointment Cancelled*\n\n"
+            . "Dear {$patient->profile->full_name},\n"
+            . "Your appointment has been cancelled.\n\n"
+            . "👨‍⚕️ *Doctor:* {$doctorName}\n"
+            . "📅 *Was scheduled:* {$dateTime}\n"
+            . "🏥 *Clinic:* {$clinic}\n"
+            . "🔖 *Ref No:* {$appointment->appointment_number}\n\n"
+            . ($reason ? "📝 *Reason:* {$reason}\n\n" : '')
+            . "Please book a new slot at your convenience.\n"
+            . "_Naumah Clinic_";
+
+        return $this->send($patient->full_mobile, $message);
+    }
+
     public function sendPaymentRequest(Appointment $appointment): bool
     {
         $patient    = $appointment->patient;

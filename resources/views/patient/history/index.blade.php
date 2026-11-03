@@ -58,7 +58,8 @@ $vtColors = [
 <div class="fade-slide">
 
 {{-- ── Family member switcher ───────────────────────────────────────────────── --}}
-@if($patient->familyMembers->isNotEmpty())
+@php $switcherMembers = $patient->familyMembers->where('relation', '!=', 'self')->values(); @endphp
+@if($switcherMembers->isNotEmpty())
 @php
     $fmColors = ['#4a3760','#3d7a6e','#7a5c3d','#3d5e7a','#7a3d4a'];
 @endphp
@@ -70,7 +71,7 @@ $vtColors = [
         </div>
         <span class="fm-switcher-name" style="{{ !isset($fm) ? 'color:var(--plum);font-weight:700' : '' }}">Myself</span>
     </a>
-    @foreach($patient->familyMembers as $i => $member)
+    @foreach($switcherMembers as $i => $member)
     @php $active = isset($fm) && $fm->id === $member->id; @endphp
     <a href="{{ route('patient.history.member', $member->id) }}" class="fm-switcher-item" style="text-decoration:none">
         <div class="fm-switcher-ring" style="{{ $active ? 'border-color:var(--plum)' : '' }}">

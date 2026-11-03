@@ -15,20 +15,24 @@ class MedicationReminderController extends Controller
 
         $active = MedicationReminder::where('patient_user_id', $patient->id)
             ->active()
-            ->with(['familyMember', 'prescription'])
+            ->with(['familyMember', 'prescription', 'prescriptionMedicine'])
             ->orderBy('start_date')
             ->get();
 
         $inactive = MedicationReminder::where('patient_user_id', $patient->id)
             ->where(fn($q) => $q->where('is_active', false)
-                                ->orWhere('end_date', '<', today()))
-            ->with(['familyMember', 'prescription'])
+                                ->orWhere('end_date', '<', today())
+                                ->orWhereNotNull('schedule_note')
+                                ->orWhere(fn($q) => $q->whereNotNull('prescription_id')
+                                    ->whereDoesntHave('prescription', fn($rx) => $rx->where('status', 'issued'))))
+            ->with(['familyMember', 'prescription', 'prescriptionMedicine'])
             ->orderByDesc('updated_at')
             ->limit(10)
             ->get();
 
         // Upcoming reminders today (for the "due today" strip)
-        $dueToday = $active->filter(fn($r) => $r->isActive())
+        $dueToday = $active->filter(fn($r) => $r->isActive()
+            && (int) $r->start_date->diffInDays(today()) % ($r->interval_days ?: 1) === 0)
             ->sortBy(fn($r) => min($r->reminder_times ?? []))
             ->values();
 
@@ -58,7 +62,7 @@ class MedicationReminderController extends Controller
             'reminder_times'    => ['required', 'array', 'min:1'],
             'reminder_times.*'  => ['required', 'date_format:H:i'],
             'start_date'        => ['required', 'date'],
-            'end_date'          => ['nullable', 'date', 'after:start_date'],
+            'end_date'          => ['nullable', 'date', 'after_or_equal:start_date'],
             'channel'           => ['required', 'in:whatsapp,sms,both'],
             'family_member_id'  => ['nullable', 'exists:family_members,id'],
             'prescription_id'   => ['nullable', 'exists:prescriptions,id'],
@@ -101,6 +105,28 @@ class MedicationReminderController extends Controller
     {
         if ($reminder->patient_user_id !== auth()->id()) abort(403);
 
+        if ($reminder->prescription_medicine_id) {
+            $request->validate([
+                'reminder_times' => ['required', 'array', 'size:' . count($reminder->reminder_times ?? [])],
+                'reminder_times.*' => ['required', 'date_format:H:i', 'distinct'],
+            ]);
+            // Preserve the doctor's dosage, duration, frequency and channel.
+            $times = $request->reminder_times;
+            sort($times);
+            $frequency = $reminder->prescriptionMedicine?->frequency ?? '';
+            if (preg_match('/^Every (6|8|12) hours$/', $frequency, $matches)) {
+                $minutes = array_map(fn($t) => (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2), $times);
+                foreach ($minutes as $i => $minute) {
+                    $next = $minutes[$i + 1] ?? $minutes[0] + 1440;
+                    if ($next - $minute !== (int) $matches[1] * 60) {
+                        return back()->withErrors(['reminder_times' => 'Keep the prescribed interval between alerts.']);
+                    }
+                }
+            }
+            $reminder->update(['reminder_times' => $times]);
+            return back()->with('success', 'Notification times updated.');
+        }
+
         $request->validate([
             'reminder_times'   => ['sometimes', 'array'],
             'reminder_times.*' => ['date_format:H:i'],
@@ -128,6 +154,12 @@ class MedicationReminderController extends Controller
     public function toggle(Request $request, MedicationReminder $reminder)
     {
         if ($reminder->patient_user_id !== auth()->id()) abort(403);
+
+        if (!$reminder->is_active && ($reminder->schedule_note
+            || ($reminder->end_date && $reminder->end_date->lt(today()))
+            || ($reminder->prescription_id && $reminder->prescription?->status !== 'issued'))) {
+            return back()->withErrors(['reminder' => 'This course cannot be activated. Ask your doctor to clarify or renew the prescription.']);
+        }
 
         $reminder->update(['is_active' => ! $reminder->is_active]);
 
