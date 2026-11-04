@@ -89,18 +89,19 @@
     vertical-align: middle;
     overflow-wrap: anywhere;
 }
-.pay-table th:nth-child(1) { width: 24%; }
-.pay-table th:nth-child(2) { width: 25%; }
-.pay-table th:nth-child(3) { width: 13%; }
-.pay-table th:nth-child(4) { width: 13%; }
+.pay-table th:nth-child(1) { width: 22%; }
+.pay-table th:nth-child(2) { width: 24%; }
+.pay-table th:nth-child(3) { width: 11%; }
+.pay-table th:nth-child(4) { width: 10%; }
 .pay-table th:nth-child(5) { width: 15%; }
-.pay-table th:nth-child(6) { width: 10%; }
+.pay-table th:nth-child(6) { width: 18%; }
 .pay-table th:nth-child(3),
 .pay-table th:nth-child(4),
 .pay-table th:nth-child(5) { text-align: center; }
 .pay-table td:nth-child(3),
 .pay-table td:nth-child(4),
 .pay-table td:nth-child(5) { text-align: center; }
+.pay-table td:nth-child(6) { white-space: nowrap; }
 .pay-table .badge {
     display: inline-flex;
     align-items: center;
@@ -250,6 +251,12 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:9px">
         @foreach($unpaidApts as $apt)
+        @php
+            $bill = $apt->bill;
+            $cardCharges = $bill && $bill->items->isNotEmpty()
+                ? $bill->items->map(fn ($i) => $i->head_label . ' ₹' . number_format((float) $i->amount, 0))->implode(' · ')
+                : null;
+        @endphp
         <div class="panel unpaid-card">
             <div class="avatar">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--txt-lt)" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -264,6 +271,16 @@
                     · {{ $apt->doctor->doctorProfile->specialization }}
                     @endif
                 </div>
+                @if($cardCharges)
+                <div style="font-size:.72rem;color:var(--txt-md);margin-top:3px" title="{{ $cardCharges }}">
+                    {{ \Illuminate\Support\Str::limit($cardCharges, 70) }}
+                </div>
+                @if((float) $bill->balance > 0 && (float) $bill->amount_paid > 0)
+                <div style="font-size:.68rem;color:#b45309;margin-top:2px">
+                    ₹{{ number_format((float) $bill->amount_paid, 0) }} already paid · balance ₹{{ number_format((float) $bill->balance, 0) }} payable at the clinic
+                </div>
+                @endif
+                @endif
             </div>
             <div class="action">
                 <div>₹{{ number_format($apt->fee, 0) }}</div>
@@ -306,6 +323,12 @@
             </tr></thead>
             <tbody>
             @foreach($payments as $pay)
+            @php
+                $payBill = $pay->bill ?? $pay->appointment?->bill;
+                $payCharges = $payBill && $payBill->items->isNotEmpty()
+                    ? $payBill->items->map(fn ($i) => $i->head_label . ' ₹' . number_format((float) $i->amount, 0))->implode(' · ')
+                    : null;
+            @endphp
             <tr class="pay-row">
                 <td style="font-size:.875rem;font-weight:500;color:var(--txt)">
                     Dr. {{ $pay->appointment?->doctor?->profile?->full_name ?? '—' }}
@@ -319,6 +342,14 @@
                     </div>
                     @if($pay->appointment?->slot_datetime)
                     <div style="font-size:.7rem;color:var(--txt-lt)">{{ $pay->appointment->slot_datetime->format('d M Y') }}</div>
+                    @endif
+                    @if($payCharges)
+                    <div style="font-size:.68rem;color:var(--txt-lt);margin-top:2px" title="{{ $payCharges }}">
+                        {{ \Illuminate\Support\Str::limit($payCharges, 64) }}
+                    </div>
+                    @if((float) $payBill->balance > 0 && in_array($payBill->status, ['draft','unpaid','partial']))
+                    <div style="font-size:.68rem;color:#b45309;margin-top:2px">Balance due ₹{{ number_format((float) $payBill->balance, 0) }}</div>
+                    @endif
                     @endif
                 </td>
                 <td style="font-family:'Lora',serif;font-size:1rem;font-weight:500;color:var(--txt);white-space:nowrap">
@@ -335,9 +366,9 @@
                 <td style="text-align:right">
                     @if($pay->isPaid())
                     <a href="{{ route('patient.payments.receipt', $pay) }}"
-                       style="font-size:.72rem;padding:4px 11px;border:1.5px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;transition:background .12s"
+                       style="display:inline-block;font-size:.72rem;padding:4px 11px;border:1.5px solid var(--warm-bd);border-radius:8px;color:var(--txt-md);text-decoration:none;white-space:nowrap;transition:background .12s"
                        onmouseover="this.style.background='var(--parch)'" onmouseout="this.style.background='transparent'">
-                        Receipt
+                        Receipt ↓
                     </a>
                     @endif
                 </td>
@@ -350,6 +381,12 @@
     {{-- Mobile card list (mirrors the table) --}}
     <div class="pay-cards">
         @foreach($payments as $pay)
+        @php
+            $payBill = $pay->bill ?? $pay->appointment?->bill;
+            $payCharges = $payBill && $payBill->items->isNotEmpty()
+                ? $payBill->items->map(fn ($i) => $i->head_label . ' ₹' . number_format((float) $i->amount, 0))->implode(' · ')
+                : null;
+        @endphp
         <div class="pay-card">
             <div class="row1">
                 <div class="doc-name">
@@ -367,6 +404,14 @@
                 <span>{{ $pay->appointment->slot_datetime->format('d M Y') }}</span>
                 @endif
             </div>
+            @if($payCharges)
+            <div style="font-size:.7rem;color:var(--txt-lt);margin-top:4px;line-height:1.35">
+                {{ $payCharges }}
+            </div>
+            @if((float) $payBill->balance > 0 && in_array($payBill->status, ['draft','unpaid','partial']))
+            <div style="font-size:.7rem;color:#b45309;margin-top:3px">Balance due ₹{{ number_format((float) $payBill->balance, 0) }}</div>
+            @endif
+            @endif
             <div class="row3">
                 <span class="badge status-{{ $pay->status }}">{{ ucfirst($pay->status) }}</span>
                 <div style="display:flex;align-items:center;gap:8px">

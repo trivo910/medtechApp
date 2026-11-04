@@ -94,7 +94,7 @@ class AppointmentController extends Controller
     public function show(Appointment $appointment)
     {
         $this->gate($appointment);
-        $appointment->load(['patient.profile', 'doctor.profile', 'doctor.doctorProfile', 'familyMember']);
+        $appointment->load(['patient.profile', 'doctor.profile', 'doctor.doctorProfile', 'familyMember', 'bill.items', 'bill.payments']);
         $previousPrescriptions = Prescription::forAppointmentPatient($appointment)
             ->with('medicines')
             ->orderByDesc('prescribed_date')

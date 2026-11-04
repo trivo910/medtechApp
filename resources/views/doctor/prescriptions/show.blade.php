@@ -148,6 +148,29 @@
         </div>
     </div>
 </div>
+
+@if($prescription->appointment)
+    @if($prescription->appointment->status !== 'cancelled')
+        @include('doctor.partials.billing-panel', [
+            'appointment'  => $prescription->appointment,
+            'bill'         => $prescription->appointment->bill,
+            'prescription' => $prescription,
+        ])
+    @endif
+@else
+    <div class="panel" style="margin-top:16px">
+        <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+                <div style="font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--txt);margin-bottom:3px">Complete Visit &amp; Payment</div>
+                <div style="font-size:.8rem;color:var(--txt-lt)">This prescription is not linked to a visit yet. Open a visit to add payment heads and complete it.</div>
+            </div>
+            <form method="POST" action="{{ route('doctor.prescriptions.start-visit', $prescription) }}">
+                @csrf
+                <button type="submit" style="padding:9px 16px;background:var(--leaf);color:#fff;border:0;border-radius:9px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">Start visit &amp; bill</button>
+            </form>
+        </div>
+    </div>
+@endif
 </div>
 
 {{-- Right sidebar --}}

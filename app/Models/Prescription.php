@@ -11,8 +11,8 @@ class Prescription extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'prescription_number', 'medical_record_id', 'doctor_user_id',
-        'patient_user_id', 'family_member_id', 'prescribed_date',
+        'prescription_number', 'medical_record_id', 'appointment_id', 'clinic_id',
+        'doctor_user_id', 'patient_user_id', 'family_member_id', 'prescribed_date',
         'diagnosis_summary', 'general_instructions', 'diet_advice',
         'follow_up_instructions', 'follow_up_date', 'pdf_path',
         'is_sent_whatsapp', 'whatsapp_sent_at', 'status',
@@ -48,6 +48,16 @@ class Prescription extends Model
     public function medicalRecord()
     {
         return $this->belongsTo(MedicalRecord::class);
+    }
+
+    public function appointment()
+    {
+        return $this->belongsTo(Appointment::class);
+    }
+
+    public function bill()
+    {
+        return $this->hasOne(Bill::class);
     }
 
     public function doctor()

@@ -8,6 +8,7 @@ use App\Models\PrescriptionMedicine;
 use App\Models\User;
 use App\Models\Appointment;
 use App\Services\PdfService;
+use App\Services\BillService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,7 @@ class PrescriptionController extends Controller
         $request->validate([
             'patient_user_id'           => ['required','exists:users,id'],
             'family_member_id'          => ['nullable','exists:family_members,id'],
+            'appointment_id'            => ['nullable','exists:appointments,id'],
             'prescribed_date'           => ['required','date'],
             'chief_complaint'           => ['nullable','string','max:500'],
             'diagnosis'                 => ['nullable','string','max:500'],
@@ -106,12 +108,20 @@ class PrescriptionController extends Controller
 
         DB::beginTransaction();
         try {
+            // Only link visits that belong to this doctor.
+            $appointmentId = null;
+            if ($request->filled('appointment_id')) {
+                $appointmentId = Appointment::where('id', $request->appointment_id)
+                    ->where('doctor_user_id', auth()->id())
+                    ->value('id');
+            }
+
             $rx = Prescription::create([
                 'doctor_user_id'         => auth()->id(),
                 'patient_user_id'        => $request->patient_user_id,
                 'family_member_id'       => $request->family_member_id ?: null,
                 'medical_record_id'      => $request->medical_record_id ?: null,
-                'appointment_id'         => $request->appointment_id ?: null,
+                'appointment_id'         => $appointmentId,
                 'prescribed_date'        => $request->prescribed_date,
                 'chief_complaint'        => $request->chief_complaint,
                 'diagnosis'              => $request->diagnosis,
@@ -166,6 +176,14 @@ class PrescriptionController extends Controller
             }
         }
 
+        if ($request->get('action') === 'complete_payment' && $rx->appointment_id) {
+            app(BillService::class)->forAppointment(Appointment::findOrFail($rx->appointment_id));
+
+            return redirect()
+                ->to(route('doctor.prescriptions.show', $rx) . '#billing')
+                ->with('success', 'Prescription saved — add the payment heads below.');
+        }
+
         if ($request->get('action') === 'send_whatsapp') {
             return redirect()->route('doctor.prescriptions.send-whatsapp', $rx)
                 ->with('success', 'Prescription saved.');
@@ -177,7 +195,11 @@ class PrescriptionController extends Controller
     public function show(Prescription $prescription)
     {
         $this->auth($prescription);
-        $prescription->load(['doctor.profile','doctor.doctorProfile','patient.profile','patient.familyMembers','medicines','medicalRecord']);
+        $prescription->load([
+            'doctor.profile', 'doctor.doctorProfile', 'patient.profile', 'patient.familyMembers',
+            'medicines', 'medicalRecord',
+            'appointment.bill.items', 'appointment.bill.payments',
+        ]);
         return view('doctor.prescriptions.show', compact('prescription'));
     }
 

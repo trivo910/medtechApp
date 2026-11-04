@@ -84,8 +84,11 @@ class AnalyticsController extends Controller
         $dayLabels = [1=>'Sun',2=>'Mon',3=>'Tue',4=>'Wed',5=>'Thu',6=>'Fri',7=>'Sat'];
         $dayData   = array_map(fn($dow) => $dayHeatmap[$dow] ?? 0, array_keys($dayLabels));
 
+        // ── Revenue by payment head (bill_items → bills) ─────────────────────
+        $headRevenue = $this->revenueByHead($doctor->id);
+
         return view('doctor.analytics.index', compact(
-            'kpis', 'aptTrend', 'topPatients', 'aptTypes', 'dayLabels', 'dayData'
+            'kpis', 'aptTrend', 'topPatients', 'aptTypes', 'dayLabels', 'dayData', 'headRevenue'
         ));
     }
 
@@ -128,5 +131,42 @@ class AnalyticsController extends Controller
         $cancelled = Appointment::where('doctor_user_id', $doctorId)->where('status','cancelled')->count();
 
         return $total > 0 ? round($cancelled / $total * 100) . '%' : '0%';
+    }
+
+    /**
+     * Revenue grouped by billing head.
+     *
+     * Only bills that actually received money count (status partial|paid with
+     * amount_paid > 0); waived and draft bills are excluded. `billed` is the
+     * raw line value; `collected` apportions each bill's payments to its lines
+     * pro rata (bill.amount_paid / bill.total), because payments are not
+     * allocated to individual lines — see docs/BILLING.md.
+     */
+    private function revenueByHead(int $doctorId): array
+    {
+        $rows = DB::table('bill_items as bi')
+            ->join('bills as b', 'b.id', '=', 'bi.bill_id')
+            ->where('b.doctor_user_id', $doctorId)
+            ->whereNull('b.deleted_at')
+            ->whereIn('b.status', ['partial', 'paid'])
+            ->where('b.amount_paid', '>', 0)
+            ->select(
+                'bi.head',
+                DB::raw('SUM(bi.amount) as billed'),
+                DB::raw('ROUND(SUM(bi.amount * b.amount_paid / NULLIF(b.total, 0)), 2) as collected')
+            )
+            ->groupBy('bi.head')
+            ->orderByDesc('billed')
+            ->get();
+
+        return $rows->map(fn ($r) => [
+            'head'      => $r->head,
+            'label'     => (string) config(
+                'medtech.billing_heads.' . $r->head . '.label',
+                ucfirst(str_replace('_', ' ', $r->head))
+            ),
+            'billed'    => (float) $r->billed,
+            'collected' => min((float) $r->billed, (float) $r->collected),
+        ])->values()->all();
     }
 }

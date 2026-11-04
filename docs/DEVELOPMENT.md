@@ -47,6 +47,84 @@ Implemented 2026-10-28 for `/doctor/appointments/{appointment}` (including `/doc
 - The standalone assignment screen accepts `member` to preselect a family member and preserves submitted selection on validation errors.
 - Appointment assignment submits with JSON and displays success or actionable failure guidance inline, preserving the form. Messages cover validation, unavailable templates/appointments, access, Premium (with a plans link), expired sessions, connection failures and unexpected server errors. Uncertain outcomes advise checking patient history before retrying to avoid duplicates. Standard form submission remains a fallback without JavaScript.
 
+## Doctor service catalogue
+
+Implemented 2026-11-04. `doctor_services` stores per-doctor quick-add lines
+(head + name + default price/quantity) for the billing panel; see
+[BILLING.md](BILLING.md) section 8. Heads are validated against
+`config('medtech.billing_heads')`. Routes live under
+`doctor.services.*` (`ServiceCatalogController`, doctor middleware). The
+billing panel partial loads the doctor's active services itself — pages that
+include it need no extra data. Verify with `php artisan test`,
+`php artisan route:list --path=doctor/services` and `php artisan view:cache`.
+
+## Revenue by payment head (analytics)
+
+Added 2026-11-04 to the premium analytics dashboard
+(`AnalyticsController::revenueByHead`); see [BILLING.md](BILLING.md) section 9.
+Counts only bills that received money (`status` partial/paid and
+`amount_paid > 0`); waived and draft bills are excluded. `collected` is a
+pro-rata estimate — payments are not stored per line — so each bill's
+payments spread across its lines by `amount_paid / total`. The card hides
+itself when no bills have been paid yet. Verified against seeded bills
+(fully-paid ₹1000 + 40%-paid ₹1000 partial ⇒ OPD 700, Lab 500, Medicines 200;
+waived bill excluded) and confirmed with `php artisan test` and
+`php artisan view:cache`.
+
+## Doctor payments page (bill-model visibility + export)
+
+Updated 2026-11-04. `GET /doctor/payments/all`
+(`PaymentsController::index`, `doctor.payments.all`) keeps its tab badges
+(all/paid/cash/unpaid) and search/filter bar, but now reflects the bill
+model:
+
+- Rows eager-load the appointment's `bill` and show a **Bill** column:
+  status badge (`paid` green, `partial` amber with collected/total, `waived`
+  violet, draft/unpaid gray), the bill number linking to
+  `doctor.bills.receipt`, and the fee column shows the bill total when a
+  bill exists (it can differ from the appointment fee after added lines
+  and discounts).
+- The **Status** column prioritizes bill state: open/partial bills show
+  their outstanding balance; waived bills show "Nothing due".
+- KPI strip is bill-aware: **Collected (bills)** (`SUM(amount_paid)` on
+  partial/paid), paid appointment fees, online/cash totals,
+  **Outstanding (bills)** (`SUM(balance)` on draft/unpaid/partial) and
+  **Waived** (`SUM(total)` on waived bills).
+
+**Excel export** — `GET /doctor/payments/all/export` (`doctor.payments.export`)
+downloads the current list as a **3-sheet workbook** through
+`ExcelExportService::exportPayments` (maatwebsite `MultiSheetExport`,
+new `WithMultipleSheets` wrapper beside `GenericExport`). It honors the same
+tab + search + filter inputs (so every sheet matches the page), and all money
+columns are numeric cells (summable in Excel):
+
+1. **Payments** — one row per visit: appointment, fee, linked bill
+   number/status/total/collected/balance, an inline
+   `Charges` column ("opd_fee: Consultation, lab_tests: CBC"), reason.
+2. **Charges** — one row per bill line: bill no/status, visit, patient,
+   payment-head label (config `medtech.billing_heads`), particulars, qty,
+   rate, amount.
+3. **Revenue by Head** — the same set aggregated per head: head key, config
+   label, line count, total qty, billed, collected est. and outstanding est.
+   Collected/outstanding are pro-rata per bill (`amount_paid/total`,
+   `balance/total`; waived bills contribute nothing to outstanding) — the
+   same rule as the analytics head report since payments are not allocated
+   to individual lines.
+
+The controller shares `tabFrom/filtersFrom/baseQuery/filteredQuery` helpers
+between `index` and `export` (export adds `->with('bill.items')`). Existing
+project tests were updated: KPI fixtures now carry
+`bill_collected`/`bill_outstanding`/`bill_waived`, and tests instantiating
+`PaymentsController` directly pass the `ExcelExportService` (the controller
+constructor injects it). The on-screen Bill column also shows a compact
+head:charges summary (title attr on hover).
+
+**Patient side** — `GET /patient/payments` (`RazorpayController::patientIndex`)
+shows the same bill data: history rows and pending cards print head-level
+charge summaries ("OPD Fee ₹500 · Lab Tests ₹500") and reasonable balances,
+waived-bill visits are excluded from "Pay Now", and the controller eager
+loads `appointment.bill.items` / `bill.items`.
+
 ## Verification
 
 The patient history page (`resources/views/doctor/patients/history.blade.php`) has a Back link above the patient card on every tab. It uses browser history to return to the previous page, with the patients list as fallback when no previous history entry exists or JavaScript is disabled.

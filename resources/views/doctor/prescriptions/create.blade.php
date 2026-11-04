@@ -43,6 +43,8 @@
     .btn-primary:hover { opacity:.88; }
     .btn-secondary { display:flex;align-items:center;gap:7px;padding:10px 18px;background:var(--cream);color:var(--leaf);border:1.5px solid var(--leaf);border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s; }
     .btn-secondary:hover { background:#edf6f4; }
+    .btn-complete { display:flex;align-items:center;gap:7px;padding:10px 20px;background:#16a34a;color:#fff;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s; }
+    .btn-complete:hover { opacity:.88; }
     .btn-ghost { padding:10px 16px;background:transparent;color:var(--txt-md);border:1.5px solid var(--warm-bd);border-radius:10px;font-size:.875rem;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif; }
     @media (max-width:768px) { .fg-3 { grid-template-columns:1fr 1fr; } .fg-4 { grid-template-columns:1fr 1fr; } .action-bar { flex-wrap:wrap;margin:0 -16px -16px;padding:12px 16px; } }
     @media (max-width:500px) { .fg-2,.fg-3,.fg-4 { grid-template-columns:1fr; } .action-bar { position:static; } .action-bar > * { flex:1 1 100%; justify-content:center; } }
@@ -347,6 +349,12 @@
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         Save Prescription
     </button>
+    @if(isset($appointment))
+    <button type="button" class="btn-complete" @click="submitForm('complete_payment')">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+        Save &amp; Complete with Payment
+    </button>
+    @endif
     <button type="button" class="btn-primary" @click="submitForm('send_whatsapp')">
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         Save &amp; Send WhatsApp

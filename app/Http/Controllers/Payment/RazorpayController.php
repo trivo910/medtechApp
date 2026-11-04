@@ -20,7 +20,12 @@ class RazorpayController extends Controller
         $patient = auth()->user();
 
         $payments = Payment::where('user_id', $patient->id)
-            ->with(['appointment.doctor.profile', 'appointment.doctor.doctorProfile'])
+            ->with([
+                'appointment.doctor.profile',
+                'appointment.doctor.doctorProfile',
+                'appointment.bill.items',
+                'bill.items',
+            ])
             ->latest()
             ->paginate(12);
 
@@ -28,15 +33,18 @@ class RazorpayController extends Controller
         $totalPaid    = Payment::where('user_id', $patient->id)->paid()->sum('amount');
         $pendingCount = Payment::where('user_id', $patient->id)->pending()->count();
 
-        // Unpaid appointments (fee set, payment_status != paid)
+        // Unpaid appointments (fee set, payment_status != paid). Bills already
+        // waived need no payment from the patient, so those visits are excluded.
         $unpaidApts = Appointment::where('patient_user_id', $patient->id)
             ->whereNotNull('fee')
             ->where('fee', '>', 0)
             ->where('payment_status', '!=', 'paid')
             ->whereIn('status', ['booked', 'confirmed'])
-            ->with(['doctor.profile', 'doctor.doctorProfile'])
+            ->with(['doctor.profile', 'doctor.doctorProfile', 'bill.items'])
             ->latest('slot_datetime')
-            ->get();
+            ->get()
+            ->filter(fn (Appointment $apt) => !in_array($apt->bill?->status, ['waived', 'paid'], true))
+            ->values();
 
         return view('patient.payments.index', compact(
             'payments', 'totalPaid', 'pendingCount', 'unpaidApts'
@@ -130,7 +138,13 @@ class RazorpayController extends Controller
     {
         if ($payment->user_id !== auth()->id()) abort(403);
 
-        $payment->load(['appointment.doctor.profile', 'appointment.doctor.doctorProfile', 'appointment.patient.profile']);
+        $payment->load([
+            'user.profile',
+            'appointment.doctor.profile',
+            'appointment.doctor.doctorProfile',
+            'appointment.patient.profile',
+            'bill',
+        ]);
 
         return view('patient.payments.receipt', compact('payment'));
     }

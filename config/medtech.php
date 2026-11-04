@@ -53,6 +53,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Billing / Payment Heads
+    |--------------------------------------------------------------------------
+    | Keys are stored in bill_items.head. Adding a new head here is enough —
+    | no migration is needed. The label is what the doctor sees.
+    */
+    'billing_heads' => [
+        'opd_fee'     => ['label' => 'OPD Fee'],
+        'medicines'   => ['label' => 'Medicines'],
+        'vaccination' => ['label' => 'Vaccination'],
+        'lab_tests'   => ['label' => 'Lab Tests'],
+        'ultrasound'  => ['label' => 'Ultrasound'],
+        'ivf'         => ['label' => 'IVF'],
+        'stem_cell'   => ['label' => 'Stem Cell'],
+        'other'       => ['label' => 'Other'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Supported Languages
     |--------------------------------------------------------------------------
     */

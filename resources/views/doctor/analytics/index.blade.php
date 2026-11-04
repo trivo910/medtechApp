@@ -82,6 +82,60 @@
     </div>
 </div>
 
+{{-- ── Revenue by payment head ─────────────────────────────────────────────── --}}
+<div style="background:#fff;border:1.5px solid var(--warm-bd);border-radius:14px;overflow:hidden;margin-bottom:22px">
+    <div style="padding:14px 20px;border-bottom:1.5px solid var(--warm-bd);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--txt)">Revenue by Payment Head</div>
+            <div style="font-size:.75rem;color:var(--txt-lt)">From money-received bills (partial &amp; paid)</div>
+        </div>
+        @php $hrTotalBilled = array_sum(array_column($headRevenue, 'billed')); $hrTotalCollected = array_sum(array_column($headRevenue, 'collected')); @endphp
+        <div style="font-size:.75rem;color:var(--txt-md)">
+            Billed <strong style="color:var(--txt)">₹{{ number_format($hrTotalBilled, 0) }}</strong> ·
+            Collected <strong style="color:#2a7a6a">₹{{ number_format($hrTotalCollected, 0) }}</strong>
+        </div>
+    </div>
+
+    @if($headRevenue === [])
+    <div style="padding:28px;text-align:center;color:var(--txt-lt);font-size:.875rem">
+        No payments recorded yet — revenue will appear once visits are completed through the billing panel.
+    </div>
+    @else
+    <div class="dr-table-wrap">
+    <table style="width:100%;border-collapse:collapse;min-width:620px">
+        <thead><tr style="border-bottom:1.5px solid var(--warm-bd)">
+            <th style="padding:9px 18px;text-align:left;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-lt)">Payment head</th>
+            <th style="padding:9px 18px;text-align:left;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-lt)">Billed</th>
+            <th style="padding:9px 18px;text-align:left;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-lt)">Collected (pro rata)</th>
+            <th style="padding:9px 18px;text-align:right;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-lt);padding-right:20px">Share of billings</th>
+        </tr></thead>
+        <tbody>
+        @foreach($headRevenue as $row)
+        <tr style="border-bottom:1px solid var(--warm-bd)">
+            <td style="padding:11px 18px;font-size:.875rem;font-weight:500;color:var(--txt)">{{ $row['label'] }}</td>
+            <td style="padding:11px 18px;font-size:.85rem;font-weight:600;color:var(--txt)">₹{{ number_format($row['billed'], 2) }}</td>
+            <td style="padding:11px 18px;font-size:.85rem;color:#2a7a6a">₹{{ number_format($row['collected'], 2) }}</td>
+            <td style="padding:11px 18px;text-align:right;padding-right:20px">
+                <div style="display:inline-flex;align-items:center;gap:8px">
+                    <div style="height:6px;background:var(--warm-bd);border-radius:3px;width:110px;overflow:hidden">
+                        <div style="height:100%;background:#d4a853;border-radius:3px;width:{{ $hrTotalBilled > 0 ? min(100, $row['billed'] / $hrTotalBilled * 100) : 0 }}%"></div>
+                    </div>
+                    <span style="font-size:.75rem;color:var(--txt-lt);width:52px;text-align:right">{{ $hrTotalBilled > 0 ? round($row['billed'] / $hrTotalBilled * 100) : 0 }}%</span>
+                </div>
+            </td>
+        </tr>
+        @endforeach
+        </tbody>
+    </table>
+    </div>
+    @if($hrTotalBilled > 0)
+    <div style="padding:10px 20px;border-top:1px solid var(--warm-bd);font-size:.7rem;color:var(--txt-lt)">
+        Collected is estimated pro rata: each bill's payments spread across its lines by share of the total. Balances still outstanding reduce it.
+    </div>
+    @endif
+    @endif
+</div>
+
 {{-- ── Top Patients ─────────────────────────────────────────────────────────── --}}
 <div style="background:#fff;border:1.5px solid var(--warm-bd);border-radius:14px;overflow:hidden">
     <div style="padding:14px 20px;border-bottom:1.5px solid var(--warm-bd)">

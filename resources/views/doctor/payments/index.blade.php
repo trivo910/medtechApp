@@ -13,7 +13,7 @@
     /* Override layout's 4-col default for this page only */
     .doc-pay-kpi-grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         gap: 16px;
         margin-bottom: 22px;
         align-items: stretch;
@@ -28,7 +28,7 @@
         .doc-pay-kpi-grid { grid-template-columns: 1fr; }
     }
     /* No icon badges on these cards — keep value on a single line.
-       Shrink the value font slightly so even "₹7,200.00" fits at 5-col width. */
+       Shrink the value font slightly so even "₹7,200.00" fits at 6-col width. */
     .doc-pay-kpi-grid .stat-card {
         min-height: 116px;
         display: flex;
@@ -39,7 +39,7 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 1.5rem;
+        font-size: 1.35rem;
         line-height: 1.2;
     }
     .doc-pay-kpi-grid .stat-label {
@@ -52,16 +52,18 @@
 
 <div class="doc-pay-kpi-grid">
 
-    {{-- 1. Total Payments ─────────────────────────────────────────────── --}}
-    <div class="stat-card" style="border-top: 3px solid var(--sage)">
-        <div class="stat-label">Total Payments</div>
-        <div class="stat-value">{{ number_format($totals['all']) }}</div>
+    {{-- 1. Collected on bills ─────────────────────────────────────────── --}}
+    <div class="stat-card" style="border-top: 3px solid var(--leaf)">
+        <div class="stat-label">Collected (bills)</div>
+        <div class="stat-value" style="color:#065f46">{{ $fmt($totals['bill_collected']) }}</div>
+        <div class="stat-sub">Money received via bills</div>
     </div>
 
-    {{-- 2. Paid (all time) ─────────────────────────────────────────────── --}}
-    <div class="stat-card" style="border-top: 3px solid var(--leaf)">
+    {{-- 2. Paid (appointment fees, all time) ─────────────────────────── --}}
+    <div class="stat-card" style="border-top: 3px solid var(--sage)">
         <div class="stat-label">Paid (all time)</div>
-        <div class="stat-value" style="color:#065f46">{{ $fmt($totals['paid']) }}</div>
+        <div class="stat-value">{{ $fmt($totals['paid']) }}</div>
+        <div class="stat-sub">Sum of marked-paid visit fees</div>
     </div>
 
     {{-- 3. Online (Razorpay+UPI) ───────────────────────────────────────── --}}
@@ -76,11 +78,18 @@
         <div class="stat-value" style="color:#92400e">{{ $fmt($totals['cash_total']) }}</div>
     </div>
 
-    {{-- 5. Total Owed ──────────────────────────────────────────────────── --}}
+    {{-- 5. Outstanding on bills ───────────────────────────────────────── --}}
     <div class="stat-card" style="border-top: 3px solid var(--coral)">
-        <div class="stat-label">Total Owed</div>
-        <div class="stat-value" style="color:#b45309">{{ $fmt($totals['due_total']) }}</div>
-        <div class="stat-sub">Unpaid appointment fees</div>
+        <div class="stat-label">Outstanding (bills)</div>
+        <div class="stat-value" style="color:#b45309">{{ $fmt($totals['bill_outstanding']) }}</div>
+        <div class="stat-sub">Balances on open &amp; partial bills</div>
+    </div>
+
+    {{-- 6. Waived ─────────────────────────────────────────────────────── --}}
+    <div class="stat-card" style="border-top: 3px solid #9d8fc0">
+        <div class="stat-label">Waived</div>
+        <div class="stat-value" style="color:#7c6f94">{{ $fmt($totals['bill_waived']) }}</div>
+        <div class="stat-sub">Bills marked waived</div>
     </div>
 
 </div>
@@ -88,8 +97,17 @@
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px">
     <div>
         <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--txt)">Payments</div>
-        <div style="font-size:.8rem;color:var(--txt-lt);margin-top:2px">All visits and how they were paid.</div>
+        <div style="font-size:.8rem;color:var(--txt-lt);margin-top:2px">All visits, their bills and how they were paid.</div>
     </div>
+    <a href="{{ route('doctor.payments.export', array_filter(($tab !== 'all' ? ['tab' => $tab] : []) + $filters, fn ($v) => $v !== '' && $v !== null)) }}"
+       style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;background:#0f766e;color:#fff;border:1px solid #0f766e;font-size:.78rem;font-weight:600;font-family:'Outfit',sans-serif;text-decoration:none;transition:background .15s"
+       onmouseover="this.style.background='#115e59'" onmouseout="this.style.background='#0f766e'"
+       title="Download the current list (respects tab and filters) as Excel">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/>
+        </svg>
+        Export Excel
+    </a>
 </div>
 
 {{-- ── Filter / search bar ────────────────────────────────────────────── --}}
@@ -569,12 +587,12 @@
 <style>
 .doc-pay-wrap { background:var(--cream); border:1px solid var(--warm-bd); border-radius:14px; overflow:hidden; }
 .doc-pay-grid-head,
-.doc-pay-grid-row { display:grid; grid-template-columns:1.2fr 1.2fr 1fr 1fr 1.6fr 1fr; align-items:center; gap:8px; }
+.doc-pay-grid-row { display:grid; grid-template-columns:1.2fr 1.2fr 1fr 1.3fr 1fr 1.5fr 1fr; align-items:center; gap:8px; }
 .doc-pay-grid-head { background:var(--parch); padding:10px 18px; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--txt-lt); }
 .doc-pay-grid-row  { padding:12px 18px; border-top:1px solid var(--warm-bd); font-size:.85rem; }
 @media (max-width: 900px) {
     .doc-pay-grid-head,
-    .doc-pay-grid-row { grid-template-columns: 1.2fr 1.2fr 1fr 1.6fr 1fr; }
+    .doc-pay-grid-row { grid-template-columns: 1.2fr 1.2fr 1fr 1.3fr 1fr 1fr; }
     .doc-pay-col-notes { display:none; }
 }
 @media (max-width: 640px) {
@@ -584,7 +602,7 @@
         grid-template-areas:
             "patient patient"
             "date    fee"
-            "status  status"
+            "bill    status"
             "notes   notes"
             "action  action";
         gap: 8px 12px;
@@ -593,14 +611,16 @@
     .doc-pay-area-patient { grid-area: patient; }
     .doc-pay-area-date    { grid-area: date; }
     .doc-pay-area-fee     { grid-area: fee; text-align:right; }
-    .doc-pay-area-status  { grid-area: status; }
+    .doc-pay-area-bill    { grid-area: bill; }
+    .doc-pay-area-status  { grid-area: status; justify-items:end; }
     .doc-pay-area-notes   { grid-area: notes; }
     .doc-pay-area-action  { grid-area: action; }
-    .doc-pay-area-fee::before  { content:"Fee ";  font-size:.65rem; color:var(--txt-lt); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; }
+    .doc-pay-area-fee::before { content:"Fee "; font-size:.65rem; color:var(--txt-lt); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; }
     .doc-pay-area-date::before { content:"Date "; font-size:.65rem; color:var(--txt-lt); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; }
+    .doc-pay-area-bill::before { content:"Bill "; font-size:.65rem; color:var(--txt-lt); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; }
     .doc-pay-area-notes { padding-top:6px; border-top:1px dashed var(--warm-bd); }
     .doc-pay-area-notes::before { content:"Notes"; font-size:.65rem; color:var(--txt-lt); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:2px; }
-    .doc-pay-area-action button { width:100%; }
+    .doc-pay-area-action button, .doc-pay-area-action a { width:100%; }
 }
 @media (max-width: 380px) {
     .doc-pay-grid-row { padding:12px 12px; }
@@ -615,6 +635,7 @@
         <div>Patient</div>
         <div>Date</div>
         <div>Fee</div>
+        <div>Bill</div>
         <div>Status</div>
         <div class="doc-pay-col-notes">Notes</div>
         <div>Action</div>
@@ -625,6 +646,16 @@
             $pName = $appt->patient?->profile?->full_name ?? '—';
             $methodLabel = $appt->payment_preference === 'cash' ? 'Cash'
                          : ($appt->payment_preference === 'online' ? 'Online' : '—');
+            $bill = $appt->bill;
+            $billBadge = null;
+            if ($bill) {
+                $billBadge = match ($bill->status) {
+                    'paid'    => ['background:#dcfce7;color:#166534', 'Paid'],
+                    'partial' => ['background:#fef9c3;color:#854d0e', 'Partial · ₹' . number_format((float) $bill->amount_paid, 0) . ' of ₹' . number_format((float) $bill->total, 0)],
+                    'waived'  => ['background:#ede9fe;color:#5b4a8a', 'Waived'],
+                    default   => ['background:#e8e4dc;color:#57534e', ucfirst($bill->status ?? 'Open')],
+                };
+            }
         @endphp
         <div class="doc-pay-grid-row">
             <div class="doc-pay-area-patient">
@@ -632,10 +663,32 @@
                 <div style="font-size:.7rem;color:var(--txt-lt);font-family:monospace">#{{ $appt->appointment_number ?? $appt->id }}</div>
             </div>
             <div class="doc-pay-area-date" style="color:var(--txt-md)">{{ $appt->slot_datetime?->format('d M Y, h:i A') }}</div>
-            <div class="doc-pay-area-fee" style="color:var(--txt);font-weight:500">{{ $fmt($appt->fee) }}</div>
+            <div class="doc-pay-area-fee" style="color:var(--txt);font-weight:500">{{ $fmt($bill ? $bill->total : $appt->fee) }}</div>
+            <div class="doc-pay-area-bill">
+                @if($bill)
+                    @php $headsSummary = $bill->items ? $bill->items->map(fn ($i) => $i->head_label . ': ' . $i->label)->implode(' · ') : ''; @endphp
+                    <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
+                        <span style="display:inline-flex;align-items:center;background:{{ $billBadge[0] }};font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $billBadge[1] }}</span>
+                        <span style="font-size:.68rem;color:var(--txt-lt);font-family:monospace" title="{{ $bill->bill_number }}">
+                            <a href="{{ route('doctor.bills.receipt', $bill) }}" target="_blank" rel="noopener" style="color:var(--txt-lt);text-decoration:none">{{ Str::limit($bill->bill_number, 18) }}</a>
+                        </span>
+                        @if($headsSummary)
+                            <span style="font-size:.66rem;color:var(--txt-md);line-height:1.3" title="{{ $headsSummary }}">{{ Str::limit($headsSummary, 64) }}</span>
+                        @endif
+                    </div>
+                @else
+                    <span style="color:var(--txt-lt);font-size:.78rem">No bill</span>
+                @endif
+            </div>
             <div class="doc-pay-area-status">
-                @if($appt->payment_status === 'paid')
+                @if($bill && $bill->balance > 0 && in_array($bill->status, ['draft','unpaid','partial']))
+                    <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
+                        <span style="display:inline-flex;align-items:center;gap:4px;background:#fee2e2;color:#b91c1c;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px">Balance {{ $fmt($bill->balance) }}</span>
+                    </div>
+                @elseif($appt->payment_status === 'paid')
                     <span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#166534;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px">Paid · {{ $methodLabel }}</span>
+                @elseif($bill && $bill->status === 'waived')
+                    <span style="display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#5b4a8a;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px">Nothing due</span>
                 @else
                     <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
                         <span style="display:inline-flex;align-items:center;gap:4px;background:#fef9c3;color:#854d0e;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px">Due
@@ -652,8 +705,8 @@
             <div class="doc-pay-area-notes doc-pay-col-notes" style="font-size:.78rem;color:var(--txt-md)">
                 @if($appt->completion_note)
                     <span title="{{ $appt->completion_note }}">{{ Str::limit($appt->completion_note, 80) }}</span>
-                @elseif($appt->completion_note)
-                    <span style="color:#475569" title="Complete Anyway note"><em>{{ Str::limit($appt->completion_note, 80) }}</em></span>
+                @elseif($appt->reason)
+                    <span style="color:var(--txt-md)" title="{{ $appt->reason }}">{{ Str::limit($appt->reason, 80) }}</span>
                 @else
                     <span style="color:var(--txt-lt)">—</span>
                 @endif
@@ -666,6 +719,11 @@
                             {{ $appt->payment_requested_at ? 'Resend Request' : 'Request Payment' }}
                         </button>
                     </form>
+                @elseif($bill && !$bill->isWaived())
+                    <a href="{{ route('doctor.bills.receipt', $bill) }}" target="_blank" rel="noopener"
+                       style="display:inline-block;text-align:center;padding:6px 12px;background:#fff;color:var(--txt-md);border:1px solid var(--warm-bd);border-radius:8px;font-size:.72rem;font-weight:600;font-family:'Outfit',sans-serif;white-space:nowrap;width:100%;text-decoration:none">
+                        View Receipt
+                    </a>
                 @else
                     <span style="color:var(--txt-lt);font-size:.78rem">—</span>
                 @endif

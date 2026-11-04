@@ -13,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
@@ -83,6 +84,131 @@ class ExcelExportService
                 filename: 'prescriptions'
             ),
             "prescriptions_{$doctor->id}_" . now()->format('Ymd') . ".xlsx"
+        );
+    }
+
+    /**
+     * Export the doctor's payments as a multi-sheet workbook (the new
+     * billing model). The appointments collection is expected to already
+     * have tab + filter + search applied and bills eager-loaded, so all
+     * three sheets stay consistent with what the doctor sees:
+     *
+     *   1. Payments            — one row per visit with bill summary
+     *   2. Charges             — one row per bill line (head + particulars)
+     *   3. Revenue by Head     — billed / collected / outstanding per head
+     */
+    public function exportPayments(User $doctor, Collection $appointments): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        // ── Sheet 1: Payments (visits + bill summary) ────────────────────
+        // Money columns are raw numbers (not formatted strings) so Excel
+        // treats them as numeric and they can be summed.
+        $paymentsRows = $appointments->map(function (Appointment $apt) {
+            $bill  = $apt->bill;
+            $heads = $bill?->items
+                ? $bill->items->map(fn ($i) => $i->head . ': ' . $i->label)->implode(', ')
+                : '—';
+
+            return [
+                $apt->appointment_number                                   ?? 'APT-' . $apt->id,
+                $apt->patient?->profile?->full_name                         ?? '—',
+                ($apt->patient?->country_code ?? '') . ($apt->patient?->mobile_number ?? ''),
+                $apt->slot_datetime?->format('d M Y h:i A')                 ?? '—',
+                ucfirst(str_replace('_', ' ', $apt->status)),
+                ucfirst($apt->payment_status ?? 'pending'),
+                ucfirst($apt->payment_preference ?? '—'),
+                (float) $apt->fee,
+                $bill?->bill_number                                         ?? '—',
+                $bill ? ucfirst($bill->status) : 'No bill',
+                $bill ? (float) $bill->total : null,
+                $bill ? (float) $bill->amount_paid : null,
+                $bill ? (float) $bill->balance : null,
+                $heads,
+                $apt->reason                                                ?? '—',
+            ];
+        });
+
+        // ── Sheet 2: Charges (one row per bill line / expense head) ──────
+        $chargeRows = $appointments
+            ->filter(fn (Appointment $apt) => $apt->bill?->items->isNotEmpty())
+            ->flatMap(fn (Appointment $apt) => $apt->bill->items
+                ->sortBy('sort_order')
+                ->map(fn ($i) => [
+                    $apt->bill->bill_number,
+                    ucfirst($apt->bill->status),
+                    $apt->appointment_number                          ?? 'APT-' . $apt->id,
+                    $apt->slot_datetime?->format('d M Y h:i A')       ?? '—',
+                    $apt->patient?->profile?->full_name               ?? '—',
+                    $i->head_label,   // config-backed payment-head label
+                    $i->label,        // specific name (CBC, TB course, …)
+                    $i->quantity,
+                    (float) $i->unit_price,
+                    (float) $i->amount,
+                ]))
+            ->values();
+
+        // ── Sheet 3: Revenue by head over this same set ──────────────────
+        // Per-line factors: collected and outstanding are estimated pro rata
+        // (payments are not allocated to individual lines — see BILLING.md).
+        $headRows = $appointments
+            ->filter(fn (Appointment $apt) => $apt->bill?->items->isNotEmpty())
+            ->flatMap(fn (Appointment $apt) => $apt->bill->items->map(fn ($item) => [
+                'item'  => $item,
+                'paidF' => (float) $apt->bill->total > 0
+                            ? (float) $apt->bill->amount_paid / (float) $apt->bill->total
+                            : 0.0,
+                'dueF'  => in_array($apt->bill->status, ['draft', 'unpaid', 'partial'], true)
+                            && (float) $apt->bill->total > 0
+                            ? (float) $apt->bill->balance / (float) $apt->bill->total
+                            : 0.0,
+            ]))
+            ->groupBy(fn ($x) => $x['item']->head)
+            ->map(function ($lines) {
+                $head    = $lines->first()['item']->head;
+                $label   = $lines->first()['item']->head_label;
+                $billed  = (float) $lines->sum(fn ($x) => (float) $x['item']->amount);
+                $collect = $lines->sum(fn ($x) => (float) $x['item']->amount * $x['paidF']);
+                $due     = $lines->sum(fn ($x) => (float) $x['item']->amount * $x['dueF']);
+
+                return [
+                    $head,                                              // Head Key
+                    $label,                                             // Head (config label)
+                    $lines->count(),                                    // Lines
+                    (int) $lines->sum(fn ($x) => (int) $x['item']->quantity), // Qty
+                    round($billed, 2),                                  // Billed
+                    round(min($billed, $collect), 2),                   // Collected est.
+                    round(max(0.0, $due), 2),                           // Outstanding est.
+                ];
+            })
+            ->sortByDesc(fn ($row) => (float) $row[4], SORT_NUMERIC)
+            ->values();
+
+        return Excel::download(
+            new MultiSheetExport([
+                new GenericExport(
+                    data:     $paymentsRows,
+                    headings: [
+                        'Apt. No', 'Patient', 'Mobile', 'Date & Time',
+                        'Visit Status', 'Payment', 'Method', 'Fee (₹)',
+                        'Bill No', 'Bill Status', 'Bill Total (₹)',
+                        'Collected on Bill (₹)', 'Balance on Bill (₹)', 'Charges (head: item)', 'Reason',
+                    ],
+                    title:    'Payments',
+                    filename: 'payments',
+                ),
+                new GenericExport(
+                    data:     $chargeRows,
+                    headings: ['Bill No', 'Bill Status', 'Visit', 'Date & Time', 'Patient', 'Head', 'Particulars', 'Qty', 'Rate (₹)', 'Amount (₹)'],
+                    title:    'Charges',
+                    filename: 'charges',
+                ),
+                new GenericExport(
+                    data:     $headRows,
+                    headings: ['Head Key', 'Head', 'Lines', 'Qty', 'Billed (₹)', 'Collected est. (₹)', 'Outstanding est. (₹)'],
+                    title:    'Revenue by Head',
+                    filename: 'revenue_by_head',
+                ),
+            ]),
+            "payments_{$doctor->id}_" . now()->format('Ymd') . ".xlsx"
         );
     }
 
@@ -320,3 +446,15 @@ class GenericExport implements FromCollection, WithHeadings, WithStyles, WithCol
 }
 // The file already has GenericExport at the bottom — appending admin exports would break it.
 // We'll update via str_replace instead.
+
+// ─── Multi-sheet workbook wrapper ────────────────────────────────────────────
+
+class MultiSheetExport implements WithMultipleSheets
+{
+    public function __construct(private array $sheets) {}
+
+    public function sheets(): array
+    {
+        return $this->sheets;
+    }
+}

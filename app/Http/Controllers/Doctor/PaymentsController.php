@@ -4,25 +4,97 @@ namespace App\Http\Controllers\Doctor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\Bill;
+use App\Services\ExcelExportService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class PaymentsController extends Controller
 {
+    public function __construct(private ExcelExportService $excel) {}
+
     // Step 3: list of all the doctor's appointments with payment info.
     public function index(Request $request)
     {
         $doctor = auth()->user();
 
-        $tab = $request->get('tab', 'all');
-        // Tabs: all | paid | cash | unpaid
-        $base = Appointment::where('doctor_user_id', $doctor->id)
-            ->with(['patient.profile', 'familyMember'])
+        $tab     = $this->tabFrom($request);
+        $filters = $this->filtersFrom($request);
+
+        $query = $this->filteredQuery($doctor, $tab, $filters);
+
+        // Counts for tabs (always reflect the un-filtered totals so the
+        // tab badges don't shrink while the user types in the search box).
+        $base = $this->baseQuery($doctor);
+
+        $counts = [
+            'all'    => (clone $base)->count(),
+            'paid'   => (clone $base)->where('payment_status', 'paid')->count(),
+            'cash'   => (clone $base)->where('payment_status', 'paid')->where('payment_preference', 'cash')->count(),
+            'unpaid' => (clone $base)->where('payment_status', 'pending')->count(),
+        ];
+
+        $payments = $query->paginate(20)->withQueryString();
+        $totals   = $this->paymentTotals($doctor->id)
+                    + $this->billTotals($doctor->id);
+
+        return view('doctor.payments.index', compact('payments', 'tab', 'counts', 'totals', 'filters'));
+    }
+
+    /**
+     * Excel export of the payments list as a 3-sheet workbook (payments,
+     * per-line charges, revenue by head). Honors the same tab, search and
+     * filter inputs as the page, so all sheets match what the doctor sees.
+     */
+    public function export(Request $request)
+    {
+        $doctor = auth()->user();
+
+        $appointments = $this->filteredQuery($doctor, $this->tabFrom($request), $this->filtersFrom($request))
+            ->with('bill.items')
+            ->get();
+
+        return $this->excel->exportPayments($doctor, $appointments);
+    }
+
+    // ── Query building (shared by index + export) ─────────────────────────
+
+    /** Active tab from the request: all | paid | cash | unpaid. */
+    private function tabFrom(Request $request): string
+    {
+        return match ($request->get('tab', 'all')) {
+            'paid', 'cash', 'unpaid' => $request->get('tab'),
+            default                  => 'all',
+        };
+    }
+
+    /** Search / filter bar inputs, exactly as the page defines them. */
+    private function filtersFrom(Request $request): array
+    {
+        return [
+            'q'      => trim((string) $request->get('q', '')),
+            'status' => $request->get('status', ''),  // '', 'paid', 'due'
+            'method' => $request->get('method', ''),  // '', 'cash', 'online'
+            'from'   => $request->get('from', ''),   // dd-mm-yyyy
+            'to'     => $request->get('to', ''),     // dd-mm-yyyy
+        ];
+    }
+
+    /** All appointments eligible for the payments page, with bill eager loads. */
+    private function baseQuery($doctor): Builder
+    {
+        return Appointment::where('doctor_user_id', $doctor->id)
+            ->with(['patient.profile', 'familyMember', 'bill.items'])
             ->whereIn('status', ['completed', 'confirmed', 'booked'])
             ->orderByDesc('slot_datetime');
+    }
 
-        $query = clone $base;
+    /** Base query + tab + search/filter bar inputs applied. */
+    private function filteredQuery($doctor, string $tab, array $filters): Builder
+    {
+        $query = clone $this->baseQuery($doctor);
+
         switch ($tab) {
             case 'paid':
                 $query->where('payment_status', 'paid');
@@ -36,30 +108,9 @@ class PaymentsController extends Controller
                 break;
         }
 
-        // ── Filter bar inputs ────────────────────────────────────────────
-        $filters = [
-            'q'      => trim((string) $request->get('q', '')),
-            'status' => $request->get('status', ''),  // '', 'paid', 'due'
-            'method' => $request->get('method', ''),  // '', 'cash', 'online'
-            'from'   => $request->get('from', ''),   // dd-mm-yyyy
-            'to'     => $request->get('to', ''),     // dd-mm-yyyy
-        ];
-
         $this->applyFilters($query, $filters);
 
-        // Counts for tabs (always reflect the un-filtered totals so the
-        // tab badges don't shrink while the user types in the search box).
-        $counts = [
-            'all'    => (clone $base)->count(),
-            'paid'   => (clone $base)->where('payment_status', 'paid')->count(),
-            'cash'   => (clone $base)->where('payment_status', 'paid')->where('payment_preference', 'cash')->count(),
-            'unpaid' => (clone $base)->where('payment_status', 'pending')->count(),
-        ];
-
-        $payments = $query->paginate(20)->withQueryString();
-        $totals   = $this->paymentTotals($doctor->id);
-
-        return view('doctor.payments.index', compact('payments', 'tab', 'counts', 'totals', 'filters'));
+        return $query;
     }
 
     /**
@@ -197,6 +248,24 @@ class PaymentsController extends Controller
             'cash_total'   => (float) (clone $paid)->where('payment_preference', 'cash')->sum('fee'),
             'online_total' => (float) (clone $paid)->where('payment_preference', 'online')->sum('fee'),
             'due_total'    => (float) $due->sum('fee'),
+        ];
+    }
+
+    /**
+     * Bill-model totals: money actually collected and still owed per the
+     * bills table (appointments alone cannot see added lines or discounts).
+     * Waived bills carry no expectation of payment, so their totals are
+     * shown separately so doctors can see how much was waived.
+     */
+    private function billTotals(int $doctorUserId): array
+    {
+        $base = Bill::where('doctor_user_id', $doctorUserId)
+            ->whereNull('deleted_at');
+
+        return [
+            'bill_collected'   => (float) (clone $base)->whereIn('status', ['partial', 'paid'])->sum('amount_paid'),
+            'bill_outstanding' => (float) (clone $base)->whereIn('status', ['draft', 'unpaid', 'partial'])->sum('balance'),
+            'bill_waived'      => (float) (clone $base)->where('status', 'waived')->sum('total'),
         ];
     }
 }

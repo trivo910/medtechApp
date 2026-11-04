@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 class Payment extends Model
 {
     protected $fillable = [
-        'user_id', 'appointment_id', 'razorpay_order_id',
+        'user_id', 'appointment_id', 'bill_id', 'razorpay_order_id',
         'razorpay_payment_id', 'razorpay_signature',
         'payment_method', 'amount', 'currency', 'status',
         'purpose', 'notes', 'paid_at',
@@ -25,6 +25,7 @@ class Payment extends Model
 
     public function user()        { return $this->belongsTo(User::class); }
     public function appointment() { return $this->belongsTo(Appointment::class); }
+    public function bill()        { return $this->belongsTo(\App\Models\Bill::class); }
 
     public function isPaid(): bool { return $this->status === 'paid'; }
 

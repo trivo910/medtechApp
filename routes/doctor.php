@@ -7,10 +7,12 @@ use App\Http\Controllers\Doctor\AccessRequestController;
 use App\Http\Controllers\Doctor\MedicalRecordController;
 use App\Http\Controllers\Doctor\PrescriptionController;
 use App\Http\Controllers\Doctor\AppointmentController;
+use App\Http\Controllers\Doctor\BillingController;
 use App\Http\Controllers\Doctor\TimelineController;
 use App\Http\Controllers\Doctor\AnalyticsController;
 use App\Http\Controllers\Doctor\QuickRegisterController;
 use App\Http\Controllers\Doctor\MedicineController;
+use App\Http\Controllers\Doctor\ServiceCatalogController;
 use App\Http\Controllers\Payment\SubscriptionController;
 use App\Http\Controllers\Payment\RazorpayController;
 use \App\Http\Controllers\Doctor\ProfileSetupController;
@@ -99,6 +101,7 @@ Route::middleware('role:doctor')->group(function () {
         Route::get('/{prescription}/send-whatsapp',   [PrescriptionController::class, 'showSendWhatsApp']) ->name('send-whatsapp');
         Route::post('/{prescription}/send-whatsapp',  [PrescriptionController::class, 'sendWhatsApp'])     ->name('send-whatsapp.send');
         Route::post('/{prescription}/regenerate-pdf', [PrescriptionController::class, 'regeneratePdf'])   ->name('regenerate-pdf');
+        Route::post('/{prescription}/start-visit',    [BillingController::class, 'startVisitForPrescription'])->name('start-visit');
     });
 
     /*
@@ -115,6 +118,8 @@ Route::middleware('role:doctor')->group(function () {
         Route::post('/{appointment}/complete',[AppointmentController::class, 'complete'])      ->name('complete');
         Route::post('/{appointment}/collect-cash', [AppointmentController::class, 'collectCash']) ->name('collect-cash');
         Route::post('/{appointment}/complete-anyway', [AppointmentController::class, 'completeAnyway']) ->name('complete-anyway');
+        Route::post('/{appointment}/billing/collect', [BillingController::class, 'collect'])          ->name('billing.collect');
+        Route::post('/{appointment}/billing/waive',   [BillingController::class, 'waive'])            ->name('billing.waive');
         Route::post('/{appointment}/cancel',  [AppointmentController::class, 'cancel'])        ->name('cancel');
         Route::post('/{appointment}/remind',  [AppointmentController::class, 'sendReminder'])  ->name('remind');
         Route::post('/{appointment}/request-payment', [AppointmentController::class, 'requestPayment'])->name('request-payment');
@@ -126,6 +131,13 @@ Route::middleware('role:doctor')->group(function () {
         Route::post('/slots/block',           [AppointmentController::class, 'saveBlockedDate'])  ->name('slots.block');
         Route::post('/slots/unblock',         [AppointmentController::class, 'removeBlockedDate'])->name('slots.unblock');
     });
+
+    /*
+    |----------------------------------------------------------------------
+    | Billing receipts
+    |----------------------------------------------------------------------
+    */
+    Route::get('/bills/{bill}/receipt', [BillingController::class, 'receipt'])->name('bills.receipt');
 
     /*
     |----------------------------------------------------------------------
@@ -190,6 +202,7 @@ Route::middleware('role:doctor')->group(function () {
     Route::prefix('payments')->name('payments.')->group(function () {
         Route::get('/',                       [RazorpayController::class, 'index'])        ->name('index');
         Route::get('/all',                    [\App\Http\Controllers\Doctor\PaymentsController::class, 'index'])->name('all');
+        Route::get('/all/export',             [\App\Http\Controllers\Doctor\PaymentsController::class, 'export'])->name('export');
         Route::get('/suggest',                [\App\Http\Controllers\Doctor\PaymentsController::class, 'patientSuggestions'])->name('suggest');
         Route::post('/order',                 [RazorpayController::class, 'createOrder'])  ->name('order');
         Route::post('/verify',                [RazorpayController::class, 'verifyPayment'])->name('verify');
@@ -201,6 +214,18 @@ Route::middleware('role:doctor')->group(function () {
     Route::post('/payments/webhook',          [RazorpayController::class, 'webhook'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
         ->name('payments.webhook');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Service Catalogue (payment head fast-fill for billing)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('services')->name('services.')->group(function () {
+        Route::get('/',              [ServiceCatalogController::class, 'index'])  ->name('index');
+        Route::post('/',             [ServiceCatalogController::class, 'store'])  ->name('store');
+        Route::put('/{service}',     [ServiceCatalogController::class, 'update']) ->name('update');
+        Route::delete('/{service}',  [ServiceCatalogController::class, 'destroy'])->name('destroy');
+    });
 
     /*
     |----------------------------------------------------------------------

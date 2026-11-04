@@ -82,6 +82,16 @@ class Appointment extends Model
         return $this->hasOne(Payment::class);
     }
 
+    public function bill()
+    {
+        return $this->hasOne(Bill::class);
+    }
+
+    public function prescriptions()
+    {
+        return $this->hasMany(Prescription::class);
+    }
+
     public function rescheduledFrom()
     {
         return $this->belongsTo(Appointment::class, 'rescheduled_from');

@@ -17,29 +17,37 @@ class DoctorPaymentsKpiTest extends TestCase
             'tab'      => 'all',
             'counts'   => ['all' => 0, 'paid' => 0, 'cash' => 0, 'unpaid' => 0],
             'totals'   => ['all'=>42,'paid'=>31450.00,'cash_total'=>12100.00,
-                           'online_total'=>19350.00,'due_total'=>4800.00],
+                           'online_total'=>19350.00,'due_total'=>4800.00,
+                           'bill_collected'=>27500.00,'bill_outstanding'=>4800.00,
+                           'bill_waived'=>1500.00],
             'filters'  => ['q'=>'','status'=>'','method'=>'','from'=>'','to'=>''],
         ]);
         $this->assertStringContainsString('doc-pay-kpi-grid', $html);
-        $this->assertStringContainsString('Total Payments', $html);
+        $this->assertStringContainsString('Collected (bills)', $html);
         $this->assertStringContainsString('Paid (all time)', $html);
         $this->assertStringContainsString('Online (Razorpay+UPI)', $html);
         $this->assertStringContainsString('Cash Collected', $html);
-        $this->assertStringContainsString('Total Owed', $html);
+        $this->assertStringContainsString('Outstanding (bills)', $html);
+        $this->assertStringContainsString('Waived', $html);
         $this->assertStringContainsString('₹31,450.00', $html);
         $this->assertStringContainsString('₹12,100.00', $html);
         $this->assertStringContainsString('₹19,350.00', $html);
         $this->assertStringContainsString('₹4,800.00', $html);
-        $this->assertStringContainsString('>42<', $html);
-        $this->assertStringContainsString('Unpaid appointment fees', $html);
+        $this->assertStringContainsString('₹1,500.00', $html);
+        $this->assertStringContainsString('Export Excel', $html);
+        $this->assertStringContainsString('doctor/payments/all/export', $html);
+        $this->assertStringContainsString('Money received via bills', $html);
+        $this->assertStringContainsString('Balances on open &amp; partial bills', $html);
+        $this->assertStringContainsString('Bills marked waived', $html);
         $this->assertStringContainsString('dp-q-suggestions', $html);
         $this->assertStringContainsString('dp-date-input', $html);
         $this->assertStringContainsString('>Patient<', $html);
+        $this->assertStringContainsString('>Bill<', $html);
     }
 
     public function test_payment_totals_method_signature(): void
     {
-        $ctrl    = new \App\Http\Controllers\Doctor\PaymentsController();
+        $ctrl    = new \App\Http\Controllers\Doctor\PaymentsController(app(\App\Services\ExcelExportService::class));
         $reflect = new \ReflectionMethod($ctrl, 'paymentTotals');
         $reflect->setAccessible(true);
         $this->assertTrue($reflect->isPrivate());

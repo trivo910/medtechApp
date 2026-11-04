@@ -14,7 +14,7 @@ class DoctorPaymentsSuggestTest extends TestCase
         $doctor = new User(['id' => 7, 'role' => 'doctor']);
         $this->actingAs($doctor);
 
-        $controller = new PaymentsController();
+        $controller = new PaymentsController(app(\App\Services\ExcelExportService::class));
         $request    = Request::create('/doctor/payments/suggest', 'GET', ['q' => '']);
         $response   = $controller->patientSuggestions($request);
 
@@ -27,7 +27,7 @@ class DoctorPaymentsSuggestTest extends TestCase
         $doctor = new User(['id' => 7, 'role' => 'doctor']);
         $this->actingAs($doctor);
 
-        $controller = new PaymentsController();
+        $controller = new PaymentsController(app(\App\Services\ExcelExportService::class));
         $request    = Request::create('/doctor/payments/suggest', 'GET', ['q' => '   ']);
         $response   = $controller->patientSuggestions($request);
 
@@ -40,7 +40,7 @@ class DoctorPaymentsSuggestTest extends TestCase
         $doctor = new User(['id' => 7, 'role' => 'doctor']);
         $this->actingAs($doctor);
 
-        $controller = new PaymentsController();
+        $controller = new PaymentsController(app(\App\Services\ExcelExportService::class));
         $request    = Request::create('/doctor/payments/suggest', 'GET');
         $response   = $controller->patientSuggestions($request);
 

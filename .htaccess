@@ -13,11 +13,12 @@
 
     # Never expose application source, runtime data, dependencies, or project
     # configuration through the web root.
-    RewriteRule ^(?:app|bootstrap|config|database|resources|routes|storage|tests|vendor|medtech)(?:/|$) - [F,NC,L]
+    RewriteRule ^(?:app|bootstrap|config|database|resources|routes|tests|vendor|medtech)(?:/|$) - [F,NC,L]
     RewriteRule ^(?:artisan|composer\.(?:json|lock)|package(?:-lock)?\.json|phpunit\.xml|vite\.config\.js|README(?:\.md)?)$ - [F,NC,L]
 
     # Serve the public tree as the site root. Existing public files are served
     # directly and all other requests reach Laravel's public/index.php.
     RewriteCond %{REQUEST_URI} !^/public(?:/|$) [NC]
     RewriteRule ^(.*)$ public/$1 [L]
+    
 </IfModule>
